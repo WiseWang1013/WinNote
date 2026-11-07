@@ -44,7 +44,7 @@ NuGet 依赖只有两个：`Microsoft.Web.WebView2` 和 `System.Speech`。没有
 - 需求提出与验收：王智涵
 - 编码代理：**DeepSeek Harness（DSH）** 的 AI 编码 Agent
 - 主要模型：**DeepSeek Flash**（`deepseek-account/deepseek-flash`，界面显示为 `DeepSeek-V4.1-Flash High`）
-- 早期界面草稿阶段使用过：**GLM-5.3-Flash**（`our-free-model/glm-5.3-flash-free`）
+- 会话早期（项目起步阶段）也使用过：**GLM-5.3-Flash**（`our-free-model/glm-5.3-flash-free`）
 - 主要工具：
   - DSH Web GUI（对话、读写文件、执行命令）
   - PowerShell / `dotnet` CLI（还原、编译、发布）

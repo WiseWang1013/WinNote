@@ -26,7 +26,7 @@
 - 导入导出：自写 MIME 邮件解析、Markdown 解析、DOCX Open XML、PDF 渲染/打印管线
 - 数据：本地 JSON + 图片文件，不联网
 - 开发工具：**DeepSeek Harness（DSH）** AI 编码代理 + PowerShell + `dotnet` CLI
-- 开发模型：主要使用 **DeepSeek Flash**（`deepseek-account/deepseek-flash`，界面标识 `DeepSeek-V4.1-Flash High`）；早期界面草稿阶段使用过 **GLM-5.3-Flash**（`our-free-model/glm-5.3-flash-free`）
+- 开发模型：主要使用 **DeepSeek Flash**（`deepseek-account/deepseek-flash`，界面标识 `DeepSeek-V4.1-Flash High`）；会话早期（项目起步阶段）也使用过 **GLM-5.3-Flash**（`our-free-model/glm-5.3-flash-free`）
 - 总体思路：WPF 负责原生窗口/DPI/关闭前保存，WebView2 负责界面与富文本编辑，JS 与 C# 用 `postMessage` 自建 Promise 桥通信；所有数据落在本机。
 
 ## 运行
