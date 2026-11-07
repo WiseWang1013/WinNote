@@ -15,9 +15,10 @@
 
 ## 下载
 
-- 发布页：<https://github.com/WiseWang1013/WinNote/releases/tag/v1.0.0>
-- 直接下载：<https://github.com/WiseWang1013/WinNote/releases/download/v1.0.0/WinNote.exe>
-- Gitee 镜像同步源码；exe 以 GitHub Release 为准。
+- GitHub 发布页：<https://github.com/WiseWang1013/WinNote/releases/tag/v1.0.0>
+- GitHub 直接下载：<https://github.com/WiseWang1013/WinNote/releases/download/v1.0.0/WinNote.exe>
+- Gitee 发布页：<https://gitee.com/WiseWang1013/WinNote/releases/tag/v1.0.0>
+- Gitee 直接下载：<https://gitee.com/WiseWang1013/WinNote/releases/download/v1.0.0/WinNote.exe>
 
 ## 技术栈与开发方式
 
