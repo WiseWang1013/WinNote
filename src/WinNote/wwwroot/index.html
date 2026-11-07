@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://media.local data: blob: https:; font-src 'self';">
+<title>备忘录</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="light">
+
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".6" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r=".6" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r=".6" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r=".6" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.12a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.97 6.01 17.46 2 12 2z"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></symbol>
+  <symbol id="i-todo" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="brand-logo" src="icon.png" alt="">
+      <div class="brand-text">
+        <h1>备忘录</h1>
+        <p>本地存储 · 自动保存</p>
+      </div>
+    </div>
+
+    <button class="new-note-btn" id="btnNew" type="button">
+      <svg class="icon"><use href="#i-plus"/></svg>
+      <span>新建备忘录</span>
+      <kbd>Ctrl N</kbd>
+    </button>
+
+    <button class="import-btn" id="btnImport" type="button" title="支持 TXT / Markdown / HTML / 邮件 / Word / PDF / 图片">
+      <svg class="icon"><use href="#i-import"/></svg>
+      <span>导入文件</span>
+    </button>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-view="all" type="button">
+        <svg class="icon"><use href="#i-note"/></svg><span>全部笔记</span><em id="countAll">0</em>
+      </button>
+      <button class="nav-item" data-view="pinned" type="button">
+        <svg class="icon"><use href="#i-pin"/></svg><span>置顶</span><em id="countPinned">0</em>
+      </button>
+      <button class="nav-item" data-view="trash" type="button">
+        <svg class="icon"><use href="#i-trash"/></svg><span>最近删除</span><em id="countTrash">0</em>
+      </button>
+    </nav>
+
+    <div class="section-head"><span>分类</span></div>
+    <nav class="cats" id="cats"></nav>
+
+    <div class="sidebar-foot">
+      <button class="foot-btn" id="btnTheme" type="button">
+        <svg class="icon"><use href="#i-moon" id="themeIcon"/></svg><span id="themeLabel">深色模式</span>
+      </button>
+      <button class="foot-btn" id="btnData" type="button">
+        <svg class="icon"><use href="#i-folder-open"/></svg><span>数据文件夹</span>
+      </button>
+      <div class="ver">WinNote 1.0 · 仅本机存储</div>
+    </div>
+  </aside>
+
+  <section class="list-pane">
+    <header class="list-head">
+      <div class="list-title">
+        <h2 id="viewTitle">全部笔记</h2>
+        <span class="count-pill" id="viewCount">0</span>
+        <button class="text-btn hidden" id="btnEmptyTrash" type="button">清空</button>
+      </div>
+      <label class="search-box">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input id="searchInput" type="text" placeholder="搜索备忘录" autocomplete="off" spellcheck="false">
+        <button class="clear-search hidden" id="btnClearSearch" type="button" aria-label="清空搜索">
+          <svg class="icon"><use href="#i-close"/></svg>
+        </button>
+      </label>
+    </header>
+
+    <div class="note-list" id="noteList"></div>
+
+    <div class="list-empty hidden" id="listEmpty">
+      <svg class="empty-art" viewBox="0 0 200 160" fill="none" aria-hidden="true">
+        <rect x="48" y="22" width="104" height="118" rx="16" fill="currentColor" opacity=".07"/>
+        <rect x="62" y="42" width="56" height="6" rx="3" fill="currentColor" opacity=".35"/>
+        <rect x="62" y="58" width="76" height="5" rx="2.5" fill="currentColor" opacity=".18"/>
+        <rect x="62" y="70" width="66" height="5" rx="2.5" fill="currentColor" opacity=".18"/>
+        <rect x="62" y="82" width="72" height="5" rx="2.5" fill="currentColor" opacity=".18"/>
+        <circle cx="146" cy="120" r="18" fill="var(--accent)" opacity=".85"/>
+        <path d="m139 120 5 5 9-10" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p id="listEmptyText">还没有备忘录</p>
+      <button class="ghost-btn" id="btnNew2" type="button">新建一条</button>
+    </div>
+  </section>
+
+  <main class="editor-pane" id="editorPane">
+    <div class="editor-empty" id="editorEmpty">
+      <svg class="empty-art" viewBox="0 0 220 170" fill="none" aria-hidden="true">
+        <rect x="52" y="20" width="116" height="128" rx="18" fill="currentColor" opacity=".06"/>
+        <rect x="52" y="20" width="116" height="128" rx="18" stroke="currentColor" stroke-opacity=".18" stroke-width="1.5"/>
+        <rect x="70" y="42" width="52" height="7" rx="3.5" fill="currentColor" opacity=".35"/>
+        <rect x="70" y="62" width="80" height="5" rx="2.5" fill="currentColor" opacity=".15"/>
+        <rect x="70" y="75" width="70" height="5" rx="2.5" fill="currentColor" opacity=".15"/>
+        <rect x="70" y="88" width="78" height="5" rx="2.5" fill="currentColor" opacity=".15"/>
+        <rect x="70" y="101" width="46" height="5" rx="2.5" fill="currentColor" opacity=".15"/>
+        <circle cx="152" cy="118" r="20" fill="var(--accent)"/>
+        <path d="M152 110v16M144 118h16" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      <h3>选择一条备忘录</h3>
+      <p>或新建一条，开始记录你的想法</p>
+      <button class="primary-btn" id="btnNew3" type="button">＋ 新建备忘录</button>
+    </div>
+
+    <div class="editor hidden" id="editor">
+      <header class="editor-head">
+        <div class="editor-meta">
+          <span id="noteTime">—</span>
+          <span class="dot">·</span>
+          <span id="noteWords">0 字</span>
+          <span class="dot">·</span>
+          <span id="saveState">已保存</span>
+        </div>
+        <button class="cat-chip" id="btnCategoryChip" type="button">
+          <i id="catChipDot"></i><span id="catChipText">未分类</span>
+          <svg class="icon chev"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="editor-actions">
+          <button class="icon-btn" id="btnPin" type="button" title="置顶">
+            <svg class="icon"><use href="#i-pin"/></svg>
+          </button>
+          <button class="icon-btn" id="btnColor" type="button" title="笔记颜色">
+            <svg class="icon"><use href="#i-palette"/></svg>
+          </button>
+          <button class="icon-btn" id="btnExport" type="button" title="导出">
+            <svg class="icon"><use href="#i-download"/></svg>
+          </button>
+          <button class="icon-btn" id="btnMore" type="button" title="更多">
+            <svg class="icon"><use href="#i-more"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="editor-scroll" id="editorScroll">
+        <div class="editor-inner">
+          <input id="titleInput" class="title-input" type="text" placeholder="标题" maxlength="120" spellcheck="false" autocomplete="off">
+          <div id="body" class="body" contenteditable="true" spellcheck="false" data-placeholder="开始输入…"></div>
+        </div>
+      </div>
+
+      <div class="toolbar-wrap">
+        <div class="toolbar" id="toolbar">
+          <button data-act="todo" type="button" title="插入待办清单">
+            <svg class="icon"><use href="#i-todo"/></svg><span>清单</span>
+          </button>
+          <button data-act="image" type="button" title="插入图片">
+            <svg class="icon"><use href="#i-image"/></svg><span>图片</span>
+          </button>
+          <button data-act="voice" id="btnVoice" type="button" title="语音输入">
+            <svg class="icon"><use href="#i-mic"/></svg><span>语音</span>
+          </button>
+          <button data-act="ocr" type="button" title="识别图片中的文字">
+            <svg class="icon"><use href="#i-scan"/></svg><span>识图</span>
+          </button>
+          <button data-act="draw" type="button" title="手写涂鸦">
+            <svg class="icon"><use href="#i-pen"/></svg><span>手写</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="voice-bar hidden" id="voiceBar">
+        <div class="voice-wave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="voice-text">
+          <strong id="voiceTitle">正在聆听…</strong>
+          <span id="voiceHypo">请开始说话，说完点「完成」</span>
+        </div>
+        <button class="voice-stop" id="voiceStop" type="button">完成</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="popover-layer hidden" id="popoverLayer"></div>
+<div class="print-root" id="printRoot"></div>
+<div class="toasts" id="toasts"></div>
+
+<div class="modal-layer hidden" id="modalLayer">
+  <div class="modal-card" id="modalCard"></div>
+</div>
+
+<div class="modal-layer hidden" id="drawLayer">
+  <div class="draw-card">
+    <div class="draw-head">
+      <div>
+        <h3>手写涂鸦</h3>
+        <p>用鼠标或触控笔写画，插入后作为图片保存在笔记里</p>
+      </div>
+      <button class="icon-btn" id="drawClose" type="button" title="关闭"><svg class="icon"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="draw-body"><canvas id="drawCanvas"></canvas></div>
+    <div class="draw-tools">
+      <div class="pen-colors" id="penColors">
+        <button class="pen-color active" data-color="#1A1A1C" style="--pc:#1A1A1C" type="button" aria-label="黑色"></button>
+        <button class="pen-color" data-color="#E8402A" style="--pc:#E8402A" type="button" aria-label="红色"></button>
+        <button class="pen-color" data-color="#0A59F7" style="--pc:#0A59F7" type="button" aria-label="蓝色"></button>
+        <button class="pen-color" data-color="#21A45D" style="--pc:#21A45D" type="button" aria-label="绿色"></button>
+        <button class="pen-color" data-color="#FF9F0A" style="--pc:#FF9F0A" type="button" aria-label="橙色"></button>
+      </div>
+      <div class="pen-widths" id="penWidths">
+        <button class="pen-width active" data-width="2.5" type="button"><i style="width:4px;height:4px"></i></button>
+        <button class="pen-width" data-width="4" type="button"><i style="width:7px;height:7px"></i></button>
+        <button class="pen-width" data-width="7" type="button"><i style="width:11px;height:11px"></i></button>
+      </div>
+      <button class="mini-btn" id="drawClear" type="button">清空</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="drawCancel" type="button">取消</button>
+      <button class="btn primary" id="drawInsert" type="button">插入笔记</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
