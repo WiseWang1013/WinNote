@@ -12,6 +12,11 @@
 - 仓库名 **WinNote**，与程序 `WinNote.exe` 同名；界面里的中文名是「备忘录」。
 - 详细架构、技术选型、导入导出流程、开发模型说明：[ARCHITECTURE.md](ARCHITECTURE.md)
 
+## 下载
+
+- 发布页：<https://github.com/WiseWang1013/WinNote/releases/tag/v1.0.0>
+- 直接下载：<https://github.com/WiseWang1013/WinNote/releases/download/v1.0.0/WinNote.exe>
+
 ## 技术栈与开发方式
 
 - 桌面外壳：**C# / .NET 10 / WPF**
@@ -26,7 +31,7 @@
 
 ## 运行
 
-直接双击：
+从 [Releases](https://github.com/WiseWang1013/WinNote/releases/tag/v1.0.0) 下载 `WinNote.exe`，或直接双击本地：
 
 ```
 D:\app\WinNote\WinNote.exe
