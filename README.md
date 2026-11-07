@@ -6,6 +6,24 @@
 
 当前版本：1.0.0
 
+## 这个仓库
+
+- GitHub：<https://github.com/WiseWang1013/WinNote>
+- 仓库名 **WinNote**，与程序 `WinNote.exe` 同名；界面里的中文名是「备忘录」。
+- 详细架构、技术选型、导入导出流程、开发模型说明：[ARCHITECTURE.md](ARCHITECTURE.md)
+
+## 技术栈与开发方式
+
+- 桌面外壳：**C# / .NET 10 / WPF**
+- 界面：**原生 HTML5 + CSS3 + JavaScript**，运行在 **WebView2** 里（没有 Vue / React）
+- 语音：Windows 自带 **SAPI** 中文识别（离线）
+- 图片文字识别：Windows 自带 **Windows.Media.Ocr**（离线）
+- 导入导出：自写 MIME 邮件解析、Markdown 解析、DOCX Open XML、PDF 渲染/打印管线
+- 数据：本地 JSON + 图片文件，不联网
+- 开发工具：**DeepSeek Harness（DSH）** AI 编码代理 + PowerShell + `dotnet` CLI
+- 开发模型：主要使用 **DeepSeek Flash**（`deepseek-account/deepseek-flash`，界面标识 `DeepSeek-V4.1-Flash High`）；早期界面草稿阶段使用过 **GLM-5.3-Flash**（`our-free-model/glm-5.3-flash-free`）
+- 总体思路：WPF 负责原生窗口/DPI/关闭前保存，WebView2 负责界面与富文本编辑，JS 与 C# 用 `postMessage` 自建 Promise 桥通信；所有数据落在本机。
+
 ## 运行
 
 直接双击：
