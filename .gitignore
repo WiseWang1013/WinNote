@@ -2,5 +2,10 @@ bin/
 obj/
 dist/
 data/
+data-*/
+profiles.json
 *.user
 WinNote.exe
+_cdp*
+_page.png
+*.tmp

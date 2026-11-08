@@ -54,6 +54,35 @@ public sealed class ImportService
             case ".docx":
                 return DocxImport.FromFileTemp(fileName, bytes, _media);
 
+            case ".xlsx":
+            case ".xlsm":
+            case ".xltx":
+            case ".xltm":
+                return XlsxImport.FromFileTemp(fileName, bytes, _media);
+
+            case ".pptx":
+            case ".pptm":
+            case ".potx":
+            case ".potm":
+                return PptxImport.FromFileTemp(fileName, bytes, _media);
+
+            case ".csv":
+                return CsvImport.FromText(text, title, fileName);
+
+            case ".xls":
+            case ".et":
+                return ImportOfficeTemp(fileName, bytes, (path, name) => OfficeComImport.FromExcel(path, _media, name));
+
+            case ".ppt":
+            case ".dps":
+                return ImportOfficeTemp(fileName, bytes, (path, name) => OfficeComImport.FromPowerPoint(path, _media, name));
+
+            case ".wps":
+                return ImportOfficeTemp(fileName, bytes, (path, name) => OfficeComImport.FromWord(path, _media, name));
+
+            case ".one":
+                return await ImportOneNoteAsync(fileName, bytes);
+
             case ".doc":
                 return await ImportDocAsync(fileName, bytes, text, baseDirectory);
 
@@ -89,6 +118,20 @@ public sealed class ImportService
         }
         if (TextDecoding.LooksLikeZip(bytes))
         {
+            var kind = DetectZipKind(bytes);
+            if (kind == "xlsx")
+            {
+                return XlsxImport.FromFileTemp(fileName, bytes, _media);
+            }
+            if (kind == "pptx")
+            {
+                return PptxImport.FromFileTemp(fileName, bytes, _media);
+            }
+            if (kind == "docx")
+            {
+                return DocxImport.FromFileTemp(fileName, bytes, _media);
+            }
+
             try
             {
                 return DocxImport.FromFileTemp(fileName, bytes, _media);
@@ -114,8 +157,83 @@ public sealed class ImportService
         return PlainTextImport.FromPlainText(text, title, fileName);
     }
 
-    private async Task<ImportResult> ImportDocAsync(string fileName, byte[] bytes, string decoded, string? baseDirectory)
+    private ImportResult ImportOfficeTemp(
+        string fileName,
+        byte[] bytes,
+        Func<string, string, ImportResult> importer)
     {
+        var directory = Path.Combine(Path.GetTempPath(), "WinNote_office_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, Path.GetFileName(fileName));
+        try
+        {
+            File.WriteAllBytes(path, bytes);
+            return importer(path, fileName);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, true);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private async Task<ImportResult> ImportOneNoteAsync(string fileName, byte[] bytes)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "WinNote_one_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, Path.GetFileName(fileName));
+        try
+        {
+            await File.WriteAllBytesAsync(path, bytes);
+            return await OfficeComImport.FromOneNoteViaPowerShellAsync(path, _media, fileName);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, true);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private static string DetectZipKind(byte[] bytes)
+    {
+        try
+        {
+            using var memory = new MemoryStream(bytes);
+            using var archive = new ZipArchive(memory, ZipArchiveMode.Read);
+            var names = archive.Entries.Select(entry => entry.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (names.Contains("xl/workbook.xml"))
+            {
+                return "xlsx";
+            }
+            if (names.Contains("ppt/presentation.xml"))
+            {
+                return "pptx";
+            }
+            if (names.Contains("word/document.xml"))
+            {
+                return "docx";
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+        return "";
+    }
+
+    private async Task<ImportResult> ImportDocAsync(string fileName, byte[] bytes, string decoded, string? baseDirectory)    {
         if (TextDecoding.LooksLikeHtml(decoded))
         {
             return HtmlImport.FromHtml(decoded, baseDirectory ?? "", _media, fileName);

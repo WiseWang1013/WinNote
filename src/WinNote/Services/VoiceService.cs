@@ -37,6 +37,11 @@ public sealed class VoiceService : IDisposable
 
             var engine = new SpeechRecognitionEngine(recognizer);
             engine.SetInputToDefaultAudioDevice();
+            engine.MaxAlternates = 5;
+            engine.InitialSilenceTimeout = TimeSpan.FromSeconds(10);
+            engine.BabbleTimeout = TimeSpan.FromSeconds(5);
+            engine.EndSilenceTimeout = TimeSpan.FromSeconds(1.1);
+            engine.EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(1.4);
             engine.LoadGrammar(new DictationGrammar());
             engine.SpeechHypothesized += (_, e) =>
             {
@@ -48,7 +53,11 @@ public sealed class VoiceService : IDisposable
             };
             engine.SpeechRecognized += (_, e) =>
             {
-                var text = e.Result?.Text?.Trim();
+                var best = e.Result?.Alternates
+                    .Cast<RecognizedPhrase>()
+                    .OrderByDescending(phrase => phrase.Confidence)
+                    .FirstOrDefault() ?? e.Result;
+                var text = best?.Text?.Trim();
                 if (!string.IsNullOrEmpty(text))
                 {
                     FinalText?.Invoke(text);
@@ -56,18 +65,14 @@ public sealed class VoiceService : IDisposable
             };
             engine.RecognizeCompleted += (_, e) =>
             {
-                if (_stopping || e.Cancelled)
-                {
-                    return;
-                }
+                var wasStopping = _stopping;
+                Cleanup();
+                ListeningChanged?.Invoke(false);
 
-                if (e.Error is not null)
+                if (!wasStopping && e.Error is not null)
                 {
                     Failed?.Invoke("语音识别中断：" + e.Error.Message);
                 }
-
-                Cleanup();
-                ListeningChanged?.Invoke(false);
             };
 
             engine.RecognizeAsync(RecognizeMode.Multiple);
@@ -94,15 +99,14 @@ public sealed class VoiceService : IDisposable
         _stopping = true;
         try
         {
-            _engine.RecognizeAsyncCancel();
+            // Stop 会等当前这一句识别完成，避免点“完成”时把最后一句话丢掉。
+            _engine.RecognizeAsyncStop();
         }
         catch
         {
-            // ignored
+            Cleanup();
+            ListeningChanged?.Invoke(false);
         }
-
-        Cleanup();
-        ListeningChanged?.Invoke(false);
     }
 
     private void Cleanup()

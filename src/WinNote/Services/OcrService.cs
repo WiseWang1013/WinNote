@@ -9,7 +9,7 @@ namespace WinNote.Services;
 
 public static class OcrService
 {
-    public static async Task<string> RecognizeAsync(string imagePath)
+    public static async Task<string> RecognizeAsync(string imagePath, string? languageTag = null)
     {
         var file = await StorageFile.GetFileFromPathAsync(imagePath);
         using var stream = await file.OpenAsync(FileAccessMode.Read);
@@ -32,9 +32,13 @@ public static class OcrService
             ExifOrientationMode.RespectExifOrientation,
             ColorManagementMode.DoNotColorManage);
 
-        var engine = OcrEngine.TryCreateFromLanguage(new Language("zh-Hans"))
+        var available = OcrEngine.AvailableRecognizerLanguages;
+        var selected = available.FirstOrDefault(language =>
+            string.Equals(language.LanguageTag, languageTag, StringComparison.OrdinalIgnoreCase));
+        var engine = (selected is not null ? OcrEngine.TryCreateFromLanguage(selected) : null)
+                     ?? OcrEngine.TryCreateFromLanguage(new Language("zh-Hans"))
                      ?? OcrEngine.TryCreateFromUserProfileLanguages()
-                     ?? throw new InvalidOperationException("系统没有安装 OCR 语言包。");
+                     ?? throw new InvalidOperationException("系统没有安装 OCR 语言包。可在 Windows 设置 → 时间和语言 → 语言中添加。");
 
         var result = await engine.RecognizeAsync(bitmap);
         var builder = new StringBuilder();
@@ -57,6 +61,17 @@ public static class OcrService
         return builder.ToString();
     }
 
+    public static List<OcrLanguageInfo> AvailableLanguages()
+    {
+        return OcrEngine.AvailableRecognizerLanguages
+            .Select(language => new OcrLanguageInfo
+            {
+                Tag = language.LanguageTag,
+                Name = language.DisplayName,
+            })
+            .ToList();
+    }
+
     private static string CleanLine(string text)
     {
         text = Regex.Replace(text.Trim(), @"\s+", " ");
@@ -66,4 +81,10 @@ public static class OcrService
         text = Regex.Replace(text, @"(?<=\d)\s+(?=\d)", "");
         return text.Trim();
     }
+}
+
+public sealed class OcrLanguageInfo
+{
+    public string Tag { get; set; } = "";
+    public string Name { get; set; } = "";
 }

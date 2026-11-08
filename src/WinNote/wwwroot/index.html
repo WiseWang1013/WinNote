@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://media.local data: blob: https:; font-src 'self';">
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://media.local https://files.local data: blob: https:; media-src 'self' https://media.local https://files.local blob:; font-src 'self';">
 <title>备忘录</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -35,6 +35,17 @@
   <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
   <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
   <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 10v6M9 13h6"/></symbol>
+  <symbol id="i-ai" viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></symbol>
 </svg>
 
 <div class="app" id="app">
@@ -70,17 +81,33 @@
       </button>
     </nav>
 
-    <div class="section-head"><span>分类</span></div>
-    <nav class="cats" id="cats"></nav>
+    <div class="sidebar-scroll">
+      <div class="section-head">
+        <span>文件夹</span>
+        <button class="section-btn" id="btnManageFolders" type="button" title="管理文件夹">
+          <svg class="icon"><use href="#i-settings"/></svg>
+        </button>
+      </div>
+      <nav class="cats" id="folders"></nav>
+
+      <div class="section-head"><span>标签</span></div>
+      <nav class="tag-cloud" id="tagList"></nav>
+
+      <div class="section-head"><span>智能文件夹</span></div>
+      <nav class="cats smart-nav" id="smartList"></nav>
+    </div>
 
     <div class="sidebar-foot">
       <button class="foot-btn" id="btnTheme" type="button">
         <svg class="icon"><use href="#i-moon" id="themeIcon"/></svg><span id="themeLabel">深色模式</span>
       </button>
+      <button class="foot-btn" id="btnSettings" type="button">
+        <svg class="icon"><use href="#i-settings"/></svg><span>设置</span>
+      </button>
       <button class="foot-btn" id="btnData" type="button">
         <svg class="icon"><use href="#i-folder-open"/></svg><span>数据文件夹</span>
       </button>
-      <div class="ver">WinNote 1.0 · 仅本机存储</div>
+      <div class="ver">WinNote 2.0 · <span id="profileLabel">本机</span></div>
     </div>
   </aside>
 
@@ -90,6 +117,9 @@
         <h2 id="viewTitle">全部笔记</h2>
         <span class="count-pill" id="viewCount">0</span>
         <button class="text-btn hidden" id="btnEmptyTrash" type="button">清空</button>
+        <button class="icon-btn list-sort" id="btnSort" type="button" title="排序">
+          <svg class="icon"><use href="#i-sort"/></svg>
+        </button>
       </div>
       <label class="search-box">
         <svg class="icon"><use href="#i-search"/></svg>
@@ -155,6 +185,9 @@
           <button class="icon-btn" id="btnColor" type="button" title="笔记颜色">
             <svg class="icon"><use href="#i-palette"/></svg>
           </button>
+          <button class="icon-btn" id="btnAi" type="button" title="本地智能工具">
+            <svg class="icon"><use href="#i-ai"/></svg>
+          </button>
           <button class="icon-btn" id="btnExport" type="button" title="导出">
             <svg class="icon"><use href="#i-download"/></svg>
           </button>
@@ -167,6 +200,7 @@
       <div class="editor-scroll" id="editorScroll">
         <div class="editor-inner">
           <input id="titleInput" class="title-input" type="text" placeholder="标题" maxlength="120" spellcheck="false" autocomplete="off">
+          <div class="tag-row" id="tagRow"></div>
           <div id="body" class="body" contenteditable="true" spellcheck="false" data-placeholder="开始输入…"></div>
         </div>
       </div>
@@ -188,7 +222,17 @@
           <button data-act="draw" type="button" title="手写涂鸦">
             <svg class="icon"><use href="#i-pen"/></svg><span>手写</span>
           </button>
+          <button data-act="insert" id="btnInsert" type="button" title="插入表格、链接、文件">
+            <svg class="icon"><use href="#i-plus"/></svg><span>插入</span>
+          </button>
         </div>
+      </div>
+
+      <div class="record-bar hidden" id="recordBar">
+        <span class="record-dot"></span>
+        <strong id="recordTime">00:00</strong>
+        <span>正在录音…</span>
+        <button class="voice-stop" id="recordStop" type="button">完成</button>
       </div>
 
       <div class="voice-bar hidden" id="voiceBar">
@@ -222,6 +266,12 @@
     </div>
     <div class="draw-body"><canvas id="drawCanvas"></canvas></div>
     <div class="draw-tools">
+      <div class="draw-modes" id="drawModes">
+        <button class="draw-mode active" data-tool="pen" type="button">水笔</button>
+        <button class="draw-mode" data-tool="brush" type="button">毛笔</button>
+        <button class="draw-mode" data-tool="pencil" type="button">铅笔</button>
+        <button class="draw-mode" data-tool="eraser" type="button">橡皮</button>
+      </div>
       <div class="pen-colors" id="penColors">
         <button class="pen-color active" data-color="#1A1A1C" style="--pc:#1A1A1C" type="button" aria-label="黑色"></button>
         <button class="pen-color" data-color="#E8402A" style="--pc:#E8402A" type="button" aria-label="红色"></button>
@@ -229,10 +279,10 @@
         <button class="pen-color" data-color="#21A45D" style="--pc:#21A45D" type="button" aria-label="绿色"></button>
         <button class="pen-color" data-color="#FF9F0A" style="--pc:#FF9F0A" type="button" aria-label="橙色"></button>
       </div>
-      <div class="pen-widths" id="penWidths">
-        <button class="pen-width active" data-width="2.5" type="button"><i style="width:4px;height:4px"></i></button>
-        <button class="pen-width" data-width="4" type="button"><i style="width:7px;height:7px"></i></button>
-        <button class="pen-width" data-width="7" type="button"><i style="width:11px;height:11px"></i></button>
+      <div class="pen-size">
+        <span>粗细</span>
+        <input id="drawWidth" type="range" min="1" max="30" step="0.5" value="3">
+        <b id="drawWidthLabel">3</b>
       </div>
       <button class="mini-btn" id="drawClear" type="button">清空</button>
       <div class="spacer"></div>

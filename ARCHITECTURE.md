@@ -282,7 +282,52 @@ dotnet publish .\src\WinNote\WinNote.csproj -c Release -r win-x64 --self-contain
 
 - `.msg`（Outlook 二进制邮件）不支持，请另存为 `.eml`。
 - 华为 `.hdoc` 是加密备份，电脑端无法完整解析；请在手机上先导出 TXT/HTML/PDF。
-- `.doc` 依赖本机 Word；没有 Word 会提示另存为 `.docx`。
+- `.doc` / `.xls` / `.ppt` / `.wps` / `.et` / `.dps` 依赖本机 Office；没有 Office 会提示另存为新格式。
+- OneNote `.one` 只导入文字，图片和手写笔迹不导入；可在 OneNote 里导出 PDF 保留版式。
 - PDF 导入最多 30 页，且逐页 OCR 会比较慢。
 - Word 导出目前把表格转成文本行，不保留原表格网格。
-- 还没有做 PNG 导出、云同步、笔记加密、多人协作。
+- 还没有做云同步 / 多账号 / 多人实时协作；“本地智能”是规则实现，不是云端大模型。
+
+## 14. 2.0 扩展
+
+### 数据兼容
+
+- `Note` 新增 `Tags` / `Files` / `Locked` / `LockedPayload`；旧 `notes.json` 缺这些字段时由 `System.Text.Json` 初始化为空数组 / false / null，不需要迁移脚本。
+- `AppSettings` 新增 `Folders` / `OcrLanguage` / `LockSalt` / `LockHash`；旧 `settings.json` 只有 `theme` 时自动补默认文件夹。
+- `NoteStore.Load()` 把超过 30 天的回收站笔记清理掉；旧数据首次被 2.0 读取时不会重写 `notes.json`，除非用户真的编辑或切换设置。
+
+### 多数据文件夹
+
+- `ProfileStore` 在 exe 旁边维护 `profiles.json`：`{ activeId, profiles:[{id,name,path}] }`；目录不可写时退到 `%LOCALAPPDATA%\WinNote\profiles.json`。
+- 首次运行：如果 exe 旁边有旧 `data`，登记为「默认数据（data）」；否则创建 `data-私人`。
+- 新建档案默认创建 `data-名称`，重名自动加序号；切换只改 `NoteStore` 的数据根目录，不改动旧目录。
+- 切换时重新映射 WebView2 的 `media.local` / `files.local` 虚拟主机，重新加载 `notes.json` / `settings.json`；旧目录保持原样。
+
+### 加密锁定
+
+- `NoteCrypto`：PBKDF2-SHA256（140000 次）派生 32 字节密钥；AES-GCM 12 字节 nonce + 16 字节 tag。
+- 密码哈希和盐存在 `settings.json`；锁定笔记的标题/正文/标签/图片/附件清单放进加密 payload，列表只保留颜色、文件夹、置顶等非敏感字段。
+- 修改密码时若还有锁定笔记，要求先全部解锁，避免旧 payload 无法解密。
+
+### Office / OneNote 导入
+
+- `.xlsx` / `.pptx`：`System.IO.Compression` + `XDocument` 直接读 Open XML；不依赖 Office。
+- `.xls` / `.ppt` / `.wps` / `.et` / `.dps`：通过本机 Excel / PowerPoint / Word COM 转成新格式，再走 Open XML 解析。
+- `.one`：因为 OneNote COM 的页面内容接口在部分环境不可用，使用一个临时 PowerShell 脚本调用 `OneNote.Application` 的 `GetHierarchy` / `GetPageContent`，把页面文字导出为 JSON，再由 C# 生成 HTML；图片和手写不导入。
+- OneNote 脚本以 UTF-8 BOM 写入，避免 Windows PowerShell 把中文当 ANSI 读。
+
+### 手写与附件
+
+- 画布支持 `pen` / `brush` / `pencil` / `eraser`，橡皮用白色覆盖（画布底色白），粗细由 1–30 的滑杆控制。
+- 附件写到 `data\files`，通过 `files.local` 虚拟主机播放/打开；`Note.Files` 收集非图片附件，图片仍走 `data\images`。
+
+### 最大化工作区
+
+- 处理 `WM_GETMINMAXINFO`：用 `MonitorFromWindow` + `GetMonitorInfo().rcWork` 设置 `ptMaxPosition` / `ptMaxSize`，最大化严格限制在显示器工作区，不被任务栏或 AppBar 覆盖。
+- `Ctrl+Alt+N` 通过 `RegisterHotKey` 注册，`WM_HOTKEY` 里恢复窗口并给前端发 `quickNote` 事件。
+
+### 多语言
+
+- 正文是 UTF-8 / UTF-16 / GB18030 自动识别，任意 Unicode 都可保存。
+- OCR 语言通过 `OcrEngine.AvailableRecognizerLanguages` 列给设置页；`RecognizeAsync(image, tag)` 优先用选中语言，失败回退 `zh-Hans` / 用户配置。
+- 界面文案目前中文；没有做完整 i18n / RTL 镜像。

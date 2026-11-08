@@ -14,4 +14,8 @@ public sealed class Note
     public bool Deleted { get; set; }
     public string? DeletedAt { get; set; }
     public string[] Images { get; set; } = Array.Empty<string>();
+    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[] Files { get; set; } = Array.Empty<string>();
+    public bool Locked { get; set; }
+    public string? LockedPayload { get; set; }
 }

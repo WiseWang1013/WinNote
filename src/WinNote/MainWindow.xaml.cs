@@ -16,9 +16,14 @@ namespace WinNote;
 
 public partial class MainWindow : Window
 {
-    private readonly NoteStore _store = new();
+    private readonly ProfileStore _profiles;
+    private readonly NoteStore _store;
     private readonly VoiceService _voice = new();
-    private readonly ImportService _importer;
+    private readonly AudioRecorder _recorder = new();
+    private ImportService _importer;
+    private HwndSource? _hwndSource;
+    private IntPtr _hotKeyHandle;
+    private const int QuickNoteHotKeyId = 0x574E;
     private bool _allowClose;
     private string _theme = "light";
 
@@ -26,6 +31,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        _profiles = new ProfileStore();
+        _store = new NoteStore(_profiles.Active.Path);
         _store.Load();
         _theme = _store.Theme;
         _importer = new ImportService(_store.ImagesDir);
@@ -39,7 +46,12 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         StateChanged += MainWindow_StateChanged;
         Closing += MainWindow_Closing;
-        Closed += (_, _) => _voice.Dispose();
+        Closed += (_, _) =>
+        {
+            _voice.Dispose();
+            _recorder.Dispose();
+            UnregisterQuickNoteHotKey();
+        };
         SourceInitialized += MainWindow_SourceInitialized;
     }
 
@@ -74,6 +86,7 @@ public partial class MainWindow : Window
         var core = Web.CoreWebView2;
         core.SetVirtualHostNameToFolderMapping("app.local", webDir, CoreWebView2HostResourceAccessKind.Allow);
         core.SetVirtualHostNameToFolderMapping("media.local", _store.ImagesDir, CoreWebView2HostResourceAccessKind.Allow);
+        core.SetVirtualHostNameToFolderMapping("files.local", _store.FilesDir, CoreWebView2HostResourceAccessKind.Allow);
 
         var settings = core.Settings;
         settings.AreDevToolsEnabled = Environment.GetEnvironmentVariable("WINNOTE_DEV") == "1";
@@ -89,9 +102,54 @@ public partial class MainWindow : Window
 
         core.WebMessageReceived += OnWebMessageReceived;
         core.NavigationCompleted += OnNavigationCompleted;
+        core.NavigationStarting += OnNavigationStarting;
+        core.NewWindowRequested += OnNewWindowRequested;
 
         UpdateWebBackground();
         core.Navigate("https://app.local/index.html");
+    }
+
+    private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(e.Uri)
+            || e.Uri.StartsWith("https://app.local/", StringComparison.OrdinalIgnoreCase)
+            || e.Uri.StartsWith("https://media.local/", StringComparison.OrdinalIgnoreCase)
+            || e.Uri.StartsWith("https://files.local/", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        try
+        {
+            if (e.Uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || e.Uri.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                || e.Uri.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+            {
+                Process.Start(new ProcessStartInfo(e.Uri) { UseShellExecute = true });
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+    }
+
+    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            if (e.Uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || e.Uri.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                Process.Start(new ProcessStartInfo(e.Uri) { UseShellExecute = true });
+            }
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
@@ -130,7 +188,21 @@ public partial class MainWindow : Window
                     Reply(message, new
                     {
                         notes = _store.Notes,
-                        settings = new { theme = _theme },
+                        settings = new
+                        {
+                            theme = _theme,
+                            folders = _store.Settings.Folders,
+                            hasPasscode = _store.HasPasscode,
+                            ocrLanguage = EnsureOcrLanguage(),
+                            ocrLanguages = OcrService.AvailableLanguages(),
+                        },
+                        profile = new
+                        {
+                            id = _profiles.ActiveId,
+                            name = _profiles.Active.Name,
+                            path = _profiles.Active.Path,
+                            profiles = _profiles.Profiles,
+                        },
                     });
                     break;
 
@@ -148,6 +220,284 @@ public partial class MainWindow : Window
                     ApplyTheme(theme);
                     _store.SaveTheme(theme);
                     Reply(message, new { theme });
+                    break;
+                }
+
+                case "setOcrLanguage":
+                {
+                    var language = PayloadString(payload, "language") ?? "zh-Hans";
+                    _store.SaveOcrLanguage(language);
+                    Reply(message, new { language });
+                    break;
+                }
+
+                case "switchProfile":
+                {
+                    var id = PayloadString(payload, "id") ?? "";
+                    var profile = _profiles.SetActive(id);
+                    _store.SwitchTo(profile.Path);
+                    _theme = _store.Theme;
+                    _importer = new ImportService(_store.ImagesDir);
+                    ApplyTheme(_theme);
+                    RemapMediaHosts();
+                    Reply(message, BuildDataPayload());
+                    break;
+                }
+
+                case "createProfile":
+                {
+                    var name = PayloadString(payload, "name") ?? "新数据文件夹";
+                    var profile = _profiles.Add(name);
+                    _store.SwitchTo(profile.Path);
+                    _theme = _store.Theme;
+                    _importer = new ImportService(_store.ImagesDir);
+                    ApplyTheme(_theme);
+                    RemapMediaHosts();
+                    Reply(message, BuildDataPayload());
+                    break;
+                }
+
+                case "chooseDataFolder":
+                {
+                    var dialog = new OpenFolderDialog
+                    {
+                        Title = "选择数据文件夹（原有内容不会被移动或删除）",
+                        Multiselect = false,
+                    };
+                    if (dialog.ShowDialog(this) != true)
+                    {
+                        Reply(message, null);
+                        break;
+                    }
+
+                    var selected = dialog.FolderName;
+                    var name = Path.GetFileName(selected.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        name = "数据文件夹";
+                    }
+
+                    var profile = _profiles.Add(name, selected);
+                    _store.SwitchTo(profile.Path);
+                    _theme = _store.Theme;
+                    _importer = new ImportService(_store.ImagesDir);
+                    ApplyTheme(_theme);
+                    RemapMediaHosts();
+                    Reply(message, BuildDataPayload());
+                    break;
+                }
+
+                case "renameProfile":
+                {
+                    var id = PayloadString(payload, "id") ?? "";
+                    var name = PayloadString(payload, "name") ?? "";
+                    var profile = _profiles.Rename(id, name);
+                    Reply(message, new
+                    {
+                        profile = new
+                        {
+                            id = _profiles.ActiveId,
+                            name = _profiles.Active.Name,
+                            path = _profiles.Active.Path,
+                            profiles = _profiles.Profiles,
+                        },
+                    });
+                    break;
+                }
+
+                case "saveFolders":
+                {
+                    var folders = payload.Deserialize<List<FolderInfo>>(JsonDefaults.Options)
+                                  ?? new List<FolderInfo>();
+                    _store.SaveFolders(folders);
+                    Reply(message, new { folders = _store.Settings.Folders });
+                    break;
+                }
+
+                case "pickFile":
+                {
+                    var dialog = new OpenFileDialog
+                    {
+                        Title = "插入文件",
+                        Filter =
+                            "音频|*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.flac;*.wma" +
+                            "|视频|*.mp4;*.webm;*.mov;*.mkv;*.avi;*.wmv" +
+                            "|图片|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp" +
+                            "|所有文件|*.*",
+                        CheckFileExists = true,
+                        Multiselect = false,
+                    };
+
+                    if (dialog.ShowDialog(this) != true)
+                    {
+                        Reply(message, null);
+                        break;
+                    }
+
+                    var sourceName = Path.GetFileName(dialog.FileName);
+                    var extension = Path.GetExtension(dialog.FileName);
+                    var kind = GetFileKind(extension);
+                    if (kind == "image")
+                    {
+                        Reply(message, ImportImage(dialog.FileName));
+                    }
+                    else
+                    {
+                        var fileName = $"{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..6]}{extension}";
+                        var destination = Path.Combine(_store.FilesDir, fileName);
+                        File.Copy(dialog.FileName, destination, false);
+                        Reply(message, new
+                        {
+                            file = fileName,
+                            url = "https://files.local/" + fileName,
+                            name = sourceName,
+                            size = new FileInfo(destination).Length,
+                            kind,
+                        });
+                    }
+
+                    break;
+                }
+
+                case "startRecording":
+                {
+                    _recorder.Start();
+                    Reply(message, new { recording = true });
+                    break;
+                }
+
+                case "stopRecording":
+                {
+                    var fileName = $"rec_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..6]}.wav";
+                    var path = Path.Combine(_store.FilesDir, fileName);
+                    _recorder.Stop(path);
+                    Reply(message, new
+                    {
+                        file = fileName,
+                        url = "https://files.local/" + fileName,
+                        name = "录音 " + DateTime.Now.ToString("MM-dd HH:mm"),
+                        size = new FileInfo(path).Length,
+                        kind = "audio",
+                    });
+                    break;
+                }
+
+                case "openFile":
+                {
+                    var fileName = Path.GetFileName(PayloadString(payload, "file") ?? "");
+                    if (string.IsNullOrEmpty(fileName))
+                    {
+                        throw new InvalidOperationException("没有指定文件。");
+                    }
+
+                    var path = Path.Combine(_store.FilesDir, fileName);
+                    if (!File.Exists(path))
+                    {
+                        throw new InvalidOperationException("文件不存在。");
+                    }
+
+                    Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+                    Reply(message, new { path });
+                    break;
+                }
+
+                case "setPasscode":
+                {
+                    var oldPasscode = PayloadString(payload, "oldPasscode") ?? "";
+                    var newPasscode = PayloadString(payload, "newPasscode") ?? "";
+                    if (newPasscode.Length < 4)
+                    {
+                        throw new InvalidOperationException("备忘录密码至少需要 4 位。");
+                    }
+
+                    if (_store.HasPasscode)
+                    {
+                        if (!NoteCrypto.Verify(oldPasscode, _store.Settings.LockSalt, _store.Settings.LockHash))
+                        {
+                            throw new InvalidOperationException("原密码不正确。");
+                        }
+
+                        if (_store.Notes.Any(n => n.Locked))
+                        {
+                            throw new InvalidOperationException("请先解锁所有已锁定的备忘录，再修改密码。");
+                        }
+                    }
+
+                    var (salt, hash) = NoteCrypto.CreatePasscode(newPasscode);
+                    _store.SaveLock(salt, hash);
+                    Reply(message, new { hasPasscode = true });
+                    break;
+                }
+
+                case "lockNote":
+                {
+                    var id = PayloadString(payload, "noteId") ?? "";
+                    var passcode = PayloadString(payload, "passcode") ?? "";
+                    if (_store.Settings.LockSalt is null
+                        || !NoteCrypto.Verify(passcode, _store.Settings.LockSalt, _store.Settings.LockHash))
+                    {
+                        throw new InvalidOperationException("密码不正确。");
+                    }
+
+                    var note = _store.Notes.FirstOrDefault(n => n.Id == id && !n.Deleted)
+                               ?? throw new InvalidOperationException("找不到这条备忘录。");
+                    if (note.Locked)
+                    {
+                        throw new InvalidOperationException("这条备忘录已经锁定了。");
+                    }
+
+                    var content = new NoteLockContent
+                    {
+                        Title = note.Title,
+                        Html = note.Html,
+                        Text = note.Text,
+                        Tags = note.Tags,
+                        Images = note.Images,
+                        Files = note.Files,
+                    };
+                    note.LockedPayload = NoteCrypto.Encrypt(content, passcode, _store.Settings.LockSalt);
+                    note.Locked = true;
+                    note.Title = "";
+                    note.Html = "";
+                    note.Text = "";
+                    note.Tags = Array.Empty<string>();
+                    note.Images = Array.Empty<string>();
+                    note.Files = Array.Empty<string>();
+                    note.UpdatedAt = DateTimeOffset.Now.ToString("o");
+                    _store.SaveAll(_store.Notes);
+                    Reply(message, note);
+                    break;
+                }
+
+                case "unlockNote":
+                {
+                    var id = PayloadString(payload, "noteId") ?? "";
+                    var passcode = PayloadString(payload, "passcode") ?? "";
+                    if (_store.Settings.LockSalt is null
+                        || !NoteCrypto.Verify(passcode, _store.Settings.LockSalt, _store.Settings.LockHash))
+                    {
+                        throw new InvalidOperationException("密码不正确。");
+                    }
+
+                    var note = _store.Notes.FirstOrDefault(n => n.Id == id)
+                               ?? throw new InvalidOperationException("找不到这条备忘录。");
+                    if (!note.Locked || string.IsNullOrEmpty(note.LockedPayload))
+                    {
+                        throw new InvalidOperationException("这条备忘录没有被锁定。");
+                    }
+
+                    var content = NoteCrypto.Decrypt(note.LockedPayload, passcode, _store.Settings.LockSalt);
+                    note.Title = content.Title;
+                    note.Html = content.Html;
+                    note.Text = content.Text;
+                    note.Tags = content.Tags ?? Array.Empty<string>();
+                    note.Images = content.Images ?? Array.Empty<string>();
+                    note.Files = content.Files ?? Array.Empty<string>();
+                    note.Locked = false;
+                    note.LockedPayload = null;
+                    note.UpdatedAt = DateTimeOffset.Now.ToString("o");
+                    _store.SaveAll(_store.Notes);
+                    Reply(message, note);
                     break;
                 }
 
@@ -197,7 +547,7 @@ public partial class MainWindow : Window
                         throw new InvalidOperationException("图片文件不存在。");
                     }
 
-                    var text = await OcrService.RecognizeAsync(path);
+                    var text = await OcrService.RecognizeAsync(path, _store.Settings.OcrLanguage);
                     Reply(message, new { text });
                     break;
                 }
@@ -224,10 +574,13 @@ public partial class MainWindow : Window
                     {
                         Title = "导入备忘录文件",
                         Filter =
-                            "所有支持的备忘录文件|*.txt;*.md;*.markdown;*.html;*.htm;*.mht;*.mhtml;*.eml;*.docx;*.doc;*.pdf;*.rtf;*.hdoc;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff" +
+                            "所有支持的备忘录文件|*.txt;*.md;*.markdown;*.html;*.htm;*.mht;*.mhtml;*.eml;*.docx;*.doc;*.pdf;*.rtf;*.hdoc;*.xlsx;*.xlsm;*.xls;*.csv;*.pptx;*.pptm;*.ppt;*.wps;*.et;*.dps;*.one;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff" +
                             "|文本 / Markdown|*.txt;*.md;*.markdown" +
                             "|网页 / 邮件|*.html;*.htm;*.mht;*.mhtml;*.eml" +
-                            "|Word|*.docx;*.doc;*.rtf" +
+                            "|Word / WPS 文字|*.docx;*.doc;*.rtf;*.wps" +
+                            "|Excel / WPS 表格|*.xlsx;*.xlsm;*.xls;*.csv;*.et" +
+                            "|PowerPoint / WPS 演示|*.pptx;*.pptm;*.ppt;*.dps" +
+                            "|OneNote|*.one" +
                             "|PDF|*.pdf" +
                             "|图片|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff" +
                             "|所有文件|*.*",
@@ -526,6 +879,66 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private string EnsureOcrLanguage()
+    {
+        var languages = OcrService.AvailableLanguages();
+        if (languages.Count == 0)
+        {
+            return _store.Settings.OcrLanguage;
+        }
+
+        if (languages.Any(language =>
+                string.Equals(language.Tag, _store.Settings.OcrLanguage, StringComparison.OrdinalIgnoreCase)))
+        {
+            return _store.Settings.OcrLanguage;
+        }
+
+        var fallback = languages[0].Tag;
+        _store.SaveOcrLanguage(fallback);
+        return fallback;
+    }
+
+    private object BuildDataPayload()
+    {        return new
+        {
+            notes = _store.Notes,
+            settings = new
+            {
+                theme = _theme,
+                folders = _store.Settings.Folders,
+                hasPasscode = _store.HasPasscode,
+                ocrLanguage = EnsureOcrLanguage(),
+                ocrLanguages = OcrService.AvailableLanguages(),
+            },
+            profile = new
+            {
+                id = _profiles.ActiveId,
+                name = _profiles.Active.Name,
+                path = _profiles.Active.Path,
+                profiles = _profiles.Profiles,
+            },
+        };
+    }
+
+    private void RemapMediaHosts()
+    {
+        try
+        {
+            if (Web.CoreWebView2 is not null)
+            {
+                Web.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "media.local", _store.ImagesDir, CoreWebView2HostResourceAccessKind.Allow);
+                Web.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "files.local", _store.FilesDir, CoreWebView2HostResourceAccessKind.Allow);
+                UpdateWebBackground();
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+    }
+
     private void Reply(BridgeMessage message, object? data)
     {
         Post(new { id = message.Id, ok = true, data });
@@ -625,14 +1038,91 @@ public partial class MainWindow : Window
     {
         try
         {
-            var handle = new WindowInteropHelper(this).Handle;
+            _hotKeyHandle = new WindowInteropHelper(this).Handle;
+            _hwndSource = HwndSource.FromHwnd(_hotKeyHandle);
+            _hwndSource?.AddHook(WndProc);
+
             var preference = 2; // DWMWCP_ROUND
-            DwmSetWindowAttribute(handle, 33, ref preference, sizeof(int));
+            DwmSetWindowAttribute(_hotKeyHandle, 33, ref preference, sizeof(int));
+            RegisterHotKey(_hotKeyHandle, QuickNoteHotKeyId, 0x0001 | 0x0002, 0x4E); // Ctrl+Alt+N
         }
         catch
         {
             // ignored
         }
+    }
+
+    private void UnregisterQuickNoteHotKey()
+    {
+        try
+        {
+            if (_hotKeyHandle != IntPtr.Zero)
+            {
+                UnregisterHotKey(_hotKeyHandle, QuickNoteHotKeyId);
+            }
+
+            _hwndSource?.RemoveHook(WndProc);
+            _hwndSource = null;
+        }
+        catch
+        {
+            // ignored
+        }
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int wmGetMinMaxInfo = 0x0024;
+        const int wmHotKey = 0x0312;
+
+        if (msg == wmGetMinMaxInfo)
+        {
+            ApplyMonitorWorkArea(hwnd, lParam);
+            handled = true;
+            return IntPtr.Zero;
+        }
+
+        if (msg == wmHotKey && wParam.ToInt32() == QuickNoteHotKeyId)
+        {
+            handled = true;
+            ShowQuickNote();
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private void ShowQuickNote()
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Show();
+        Activate();
+        Post(new { @event = "quickNote", data = new { } });
+    }
+
+    private static void ApplyMonitorWorkArea(IntPtr hwnd, IntPtr lParam)
+    {
+        var monitor = MonitorFromWindow(hwnd, 0x00000002); // MONITOR_DEFAULTTONEAREST
+        if (monitor == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var info = new MonitorInfo { cbSize = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref info))
+        {
+            return;
+        }
+
+        var minMax = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        minMax.ptMaxPosition.X = info.rcWork.Left - info.rcMonitor.Left;
+        minMax.ptMaxPosition.Y = info.rcWork.Top - info.rcMonitor.Top;
+        minMax.ptMaxSize.X = info.rcWork.Right - info.rcWork.Left;
+        minMax.ptMaxSize.Y = info.rcWork.Bottom - info.rcWork.Top;
+        Marshal.StructureToPtr(minMax, lParam, true);
     }
 
     private void MainWindow_StateChanged(object? sender, EventArgs e)
@@ -710,8 +1200,67 @@ public partial class MainWindow : Window
 
         _allowClose = true;
         _voice.Stop();
+        _recorder.Dispose();
         Close();
     }
+
+    private static string GetFileKind(string extension)
+    {
+        return extension.ToLowerInvariant() switch
+        {
+            ".mp3" or ".wav" or ".m4a" or ".aac" or ".ogg" or ".flac" or ".wma" => "audio",
+            ".mp4" or ".webm" or ".mov" or ".mkv" or ".avi" or ".wmv" => "video",
+            ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".tif" or ".tiff" => "image",
+            _ => "file",
+        };
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint ptReserved;
+        public NativePoint ptMaxSize;
+        public NativePoint ptMaxPosition;
+        public NativePoint ptMinTrackSize;
+        public NativePoint ptMaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int cbSize;
+        public NativeRect rcMonitor;
+        public NativeRect rcWork;
+        public uint dwFlags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    [DllImport("user32.dll")]
+    private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint virtualKey);
+
+    [DllImport("user32.dll")]
+    private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
