@@ -71,13 +71,15 @@ WinNote.registerTheme({
 
 内置主题也在 `src/WinNote/wwwroot/themes.js`，可以直接参考。主题文件是本地受信任的 JS，导入前请确认来源。
 
-### 已生成的 10 个额外主题
+### 已生成的 31 个额外主题
 
-`D:\app\appearance` 里已经放好 10 个可直接导入的主题：
+`D:\app\appearance` 里已经放好 31 个可直接导入的主题。
 
-`亚克力`、`Aero`、`磨砂玻璃`、`极光`、`海盐`、`莫兰迪`、`暗夜霓虹`、`纸张`、`咖啡`、`樱花`。
+风格类：企业简洁、极简扁平、新拟物、暗黑专业、现代渐变、复古怀旧、二次元漫画、游戏 HUD、亚克力、Aero、磨砂玻璃、极光、海盐、莫兰迪、暗夜霓虹、纸张、咖啡、樱花。
 
-主题源文件也放在仓库的 `appearance/` 目录，Release 里提供 `WinNote-appearance.zip`。打开设置 → 主题，点「导入 D:\app\appearance」，会把这 10 个主题复制到当前 data 文件夹的 `appearance` 目录并显示在主题列表中。
+品牌类：微软、谷歌、苹果、华为、小米、火狐、三星、一加、Vercel、Linear、Notion、Spotify、Nord。
+
+主题源文件也放在仓库的 `appearance/` 目录，Release 里提供 `WinNote-appearance.zip`。打开设置 → 主题，点「导入 D:\app\appearance」，会把这些主题复制到当前 data 文件夹的 `appearance` 目录并显示在主题列表中。
 
 ## 2.0 新增
 
