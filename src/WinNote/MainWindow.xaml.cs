@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private HwndSource? _hwndSource;
     private IntPtr _hotKeyHandle;
     private const int QuickNoteHotKeyId = 0x574E;
+    private const int MoveWindowHotKeyId = 0x574F;
     private bool _allowClose;
     private string _theme = "light";
 
@@ -87,6 +88,7 @@ public partial class MainWindow : Window
         core.SetVirtualHostNameToFolderMapping("app.local", webDir, CoreWebView2HostResourceAccessKind.Allow);
         core.SetVirtualHostNameToFolderMapping("media.local", _store.ImagesDir, CoreWebView2HostResourceAccessKind.Allow);
         core.SetVirtualHostNameToFolderMapping("files.local", _store.FilesDir, CoreWebView2HostResourceAccessKind.Allow);
+        core.SetVirtualHostNameToFolderMapping("appearance.local", _store.AppearanceDir, CoreWebView2HostResourceAccessKind.Allow);
 
         var settings = core.Settings;
         settings.AreDevToolsEnabled = Environment.GetEnvironmentVariable("WINNOTE_DEV") == "1";
@@ -195,6 +197,9 @@ public partial class MainWindow : Window
                             hasPasscode = _store.HasPasscode,
                             ocrLanguage = EnsureOcrLanguage(),
                             ocrLanguages = OcrService.AvailableLanguages(),
+                            appearance = BuildAppearancePayload(),
+                            customThemes = ListCustomThemes(),
+                            appearanceDir = _store.AppearanceDir,
                         },
                         profile = new
                         {
@@ -230,6 +235,136 @@ public partial class MainWindow : Window
                     Reply(message, new { language });
                     break;
                 }
+
+                case "saveAppearance":
+                {
+                    var oldInset = _store.Settings.TopSafeInset;
+                    _store.SaveAppearance(
+                        PayloadString(payload, "themeId") ?? "flat",
+                        PayloadString(payload, "accent") ?? "blue",
+                        PayloadString(payload, "radiusStyle") ?? "squircle",
+                        PayloadBool(payload, "animations", true),
+                        PayloadInt(payload, "topSafeInset", 0));
+                    if (oldInset != _store.Settings.TopSafeInset && WindowState == WindowState.Maximized)
+                    {
+                        WindowState = WindowState.Normal;
+                        WindowState = WindowState.Maximized;
+                    }
+                    Reply(message, BuildAppearancePayload());
+                    break;
+                }
+
+                case "setChrome":
+                {
+                    ApplyChromeColors(
+                        ParseColor(PayloadString(payload, "bg"), Color.FromRgb(0xF2, 0xF3, 0xF5)),
+                        ParseColor(PayloadString(payload, "fg"), Color.FromRgb(0x1A, 0x1A, 0x1C)),
+                        ParseColor(PayloadString(payload, "sub"), Color.FromRgb(0x8E, 0x90, 0x96)),
+                        ParseColor(PayloadString(payload, "hover"), Color.FromRgb(0xE4, 0xE6, 0xEA)),
+                        ParseColor(PayloadString(payload, "pressed"), Color.FromRgb(0xD9, 0xDB, 0xE0)),
+                        ParseColor(PayloadString(payload, "line"), Color.FromRgb(0xE6, 0xE8, 0xEC)));
+                    Reply(message, null);
+                    break;
+                }
+
+                case "listCustomThemes":
+                    Reply(message, new { files = ListCustomThemes(), dir = _store.AppearanceDir });
+                    break;
+
+                case "importTheme":
+                {
+                    var dialog = new OpenFileDialog
+                    {
+                        Title = "导入外观主题（JavaScript 配置文件）",
+                        Filter = "WinNote 主题|*.js|所有文件|*.*",
+                        CheckFileExists = true,
+                        Multiselect = false,
+                        InitialDirectory = Directory.Exists(@"D:\app\appearance")
+                            ? @"D:\app\appearance"
+                            : "",
+                    };
+                    if (dialog.ShowDialog(this) != true)
+                    {
+                        Reply(message, null);
+                        break;
+                    }
+
+                    var fileName = SanitizeThemeFileName(Path.GetFileName(dialog.FileName));
+                    var destination = Path.Combine(_store.AppearanceDir, fileName);
+                    File.Copy(dialog.FileName, destination, true);
+                    Reply(message, new { file = fileName });
+                    break;
+                }
+
+                case "importThemeLibrary":
+                {
+                    var source = @"D:\app\appearance";
+                    if (!Directory.Exists(source))
+                    {
+                        throw new InvalidOperationException("没有找到 D:\\app\\appearance 目录。");
+                    }
+
+                    var count = 0;
+                    foreach (var file in Directory.GetFiles(source, "*.js"))
+                    {
+                        var name = SanitizeThemeFileName(Path.GetFileName(file));
+                        File.Copy(file, Path.Combine(_store.AppearanceDir, name), true);
+                        count++;
+                    }
+
+                    Reply(message, new { count, files = ListCustomThemes() });
+                    break;
+                }
+
+                case "deleteTheme":
+                {
+                    var fileName = Path.GetFileName(PayloadString(payload, "file") ?? "");
+                    if (string.IsNullOrEmpty(fileName) || !fileName.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("主题文件名不正确。");
+                    }
+
+                    var path = Path.Combine(_store.AppearanceDir, fileName);
+                    if (!path.StartsWith(_store.AppearanceDir, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("主题路径不正确。");
+                    }
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
+                    Reply(message, new { files = ListCustomThemes() });
+                    break;
+                }
+
+                case "openAppearanceFolder":
+                    Directory.CreateDirectory(_store.AppearanceDir);
+                    Process.Start(new ProcessStartInfo("explorer.exe", _store.AppearanceDir) { UseShellExecute = true });
+                    Reply(message, new { path = _store.AppearanceDir });
+                    break;
+
+                case "setWindowInset":
+                {
+                    var inset = Math.Clamp(PayloadInt(payload, "topSafeInset", 0), 0, 80);
+                    _store.SaveAppearance(
+                        _store.Settings.ThemeId,
+                        _store.Settings.Accent,
+                        _store.Settings.RadiusStyle,
+                        _store.Settings.Animations,
+                        inset);
+                    if (WindowState == WindowState.Maximized)
+                    {
+                        WindowState = WindowState.Normal;
+                        WindowState = WindowState.Maximized;
+                    }
+                    Reply(message, BuildAppearancePayload());
+                    break;
+                }
+
+                case "moveWindow":
+                    StartMoveWindow();
+                    Reply(message, null);
+                    break;
 
                 case "switchProfile":
                 {
@@ -898,6 +1033,127 @@ public partial class MainWindow : Window
         return fallback;
     }
 
+    private object BuildAppearancePayload()
+    {
+        return new
+        {
+            themeId = _store.Settings.ThemeId,
+            accent = _store.Settings.Accent,
+            radiusStyle = _store.Settings.RadiusStyle,
+            animations = _store.Settings.Animations,
+            topSafeInset = _store.Settings.TopSafeInset,
+        };
+    }
+
+    private List<string> ListCustomThemes()
+    {
+        try
+        {
+            return Directory.GetFiles(_store.AppearanceDir, "*.js")
+                .Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList()!;
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    private void ApplyChromeColors(
+        Color background,
+        Color foreground,
+        Color sub,
+        Color hover,
+        Color pressed,
+        Color line)
+    {
+        Resources["ChromeBg"] = new SolidColorBrush(background);
+        Resources["ChromeFg"] = new SolidColorBrush(foreground);
+        Resources["ChromeSub"] = new SolidColorBrush(sub);
+        Resources["ChromeHover"] = new SolidColorBrush(hover);
+        Resources["ChromePressed"] = new SolidColorBrush(pressed);
+        Resources["ChromeLine"] = new SolidColorBrush(line);
+
+        RootGrid.Background = new SolidColorBrush(background);
+        TitleBar.Background = new SolidColorBrush(background);
+        TitleBar.BorderBrush = new SolidColorBrush(line);
+        AppTitle.Foreground = new SolidColorBrush(foreground);
+        AppSub.Foreground = new SolidColorBrush(sub);
+        BtnMin.Foreground = new SolidColorBrush(foreground);
+        BtnMax.Foreground = new SolidColorBrush(foreground);
+        BtnClose.Foreground = new SolidColorBrush(foreground);
+        Background = new SolidColorBrush(background);
+        UpdateWebBackground();
+    }
+
+    private static Color ParseColor(string? value, Color fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        try
+        {
+            return (Color)ColorConverter.ConvertFromString(value);
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private static string SanitizeThemeFileName(string name)
+    {
+        foreach (var c in Path.GetInvalidFileNameChars())
+        {
+            name = name.Replace(c, '_');
+        }
+
+        name = name.Trim();
+        if (!name.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        {
+            name += ".js";
+        }
+        return string.IsNullOrWhiteSpace(name) ? "theme-" + Guid.NewGuid().ToString("N")[..8] + ".js" : name;
+    }
+
+    private static bool PayloadBool(JsonElement payload, string name, bool fallback)
+    {
+        if (payload.ValueKind != JsonValueKind.Object || !payload.TryGetProperty(name, out var value))
+        {
+            return fallback;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String => bool.TryParse(value.GetString(), out var parsed) ? parsed : fallback,
+            _ => fallback,
+        };
+    }
+
+    private static int PayloadInt(JsonElement payload, string name, int fallback)
+    {
+        if (payload.ValueKind != JsonValueKind.Object || !payload.TryGetProperty(name, out var value))
+        {
+            return fallback;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number))
+        {
+            return number;
+        }
+        if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out var parsed))
+        {
+            return parsed;
+        }
+        return fallback;
+    }
+
     private object BuildDataPayload()
     {        return new
         {
@@ -909,6 +1165,9 @@ public partial class MainWindow : Window
                 hasPasscode = _store.HasPasscode,
                 ocrLanguage = EnsureOcrLanguage(),
                 ocrLanguages = OcrService.AvailableLanguages(),
+                appearance = BuildAppearancePayload(),
+                customThemes = ListCustomThemes(),
+                appearanceDir = _store.AppearanceDir,
             },
             profile = new
             {
@@ -930,6 +1189,8 @@ public partial class MainWindow : Window
                     "media.local", _store.ImagesDir, CoreWebView2HostResourceAccessKind.Allow);
                 Web.CoreWebView2.SetVirtualHostNameToFolderMapping(
                     "files.local", _store.FilesDir, CoreWebView2HostResourceAccessKind.Allow);
+                Web.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "appearance.local", _store.AppearanceDir, CoreWebView2HostResourceAccessKind.Allow);
                 UpdateWebBackground();
             }
         }
@@ -1045,6 +1306,7 @@ public partial class MainWindow : Window
             var preference = 2; // DWMWCP_ROUND
             DwmSetWindowAttribute(_hotKeyHandle, 33, ref preference, sizeof(int));
             RegisterHotKey(_hotKeyHandle, QuickNoteHotKeyId, 0x0001 | 0x0002, 0x4E); // Ctrl+Alt+N
+            RegisterHotKey(_hotKeyHandle, MoveWindowHotKeyId, 0x0001 | 0x0002, 0x4D); // Ctrl+Alt+M
         }
         catch
         {
@@ -1059,6 +1321,7 @@ public partial class MainWindow : Window
             if (_hotKeyHandle != IntPtr.Zero)
             {
                 UnregisterHotKey(_hotKeyHandle, QuickNoteHotKeyId);
+                UnregisterHotKey(_hotKeyHandle, MoveWindowHotKeyId);
             }
 
             _hwndSource?.RemoveHook(WndProc);
@@ -1087,8 +1350,29 @@ public partial class MainWindow : Window
             handled = true;
             ShowQuickNote();
         }
+        else if (msg == wmHotKey && wParam.ToInt32() == MoveWindowHotKeyId)
+        {
+            handled = true;
+            StartMoveWindow();
+        }
 
         return IntPtr.Zero;
+    }
+
+    private void StartMoveWindow()
+    {
+        Activate();
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                DragMove();
+            }
+            catch
+            {
+                // ignored
+            }
+        });
     }
 
     private void ShowQuickNote()
@@ -1103,7 +1387,7 @@ public partial class MainWindow : Window
         Post(new { @event = "quickNote", data = new { } });
     }
 
-    private static void ApplyMonitorWorkArea(IntPtr hwnd, IntPtr lParam)
+    private void ApplyMonitorWorkArea(IntPtr hwnd, IntPtr lParam)
     {
         var monitor = MonitorFromWindow(hwnd, 0x00000002); // MONITOR_DEFAULTTONEAREST
         if (monitor == IntPtr.Zero)
@@ -1118,10 +1402,16 @@ public partial class MainWindow : Window
         }
 
         var minMax = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        var inset = Math.Clamp(_store.Settings.TopSafeInset, 0, 80);
+        if (inset > 0)
+        {
+            // WindowChrome 最大化时会吃掉 8px 边框，补回来保证实际留白等于用户设置值。
+            inset += 8;
+        }
         minMax.ptMaxPosition.X = info.rcWork.Left - info.rcMonitor.Left;
-        minMax.ptMaxPosition.Y = info.rcWork.Top - info.rcMonitor.Top;
+        minMax.ptMaxPosition.Y = info.rcWork.Top - info.rcMonitor.Top + inset;
         minMax.ptMaxSize.X = info.rcWork.Right - info.rcWork.Left;
-        minMax.ptMaxSize.Y = info.rcWork.Bottom - info.rcWork.Top;
+        minMax.ptMaxSize.Y = Math.Max(200, info.rcWork.Bottom - info.rcWork.Top - inset);
         Marshal.StructureToPtr(minMax, lParam, true);
     }
 

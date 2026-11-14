@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://media.local https://files.local data: blob: https:; media-src 'self' https://media.local https://files.local blob:; font-src 'self';">
+      content="default-src 'none'; script-src 'self' https://appearance.local; style-src 'self' 'unsafe-inline'; img-src 'self' https://media.local https://files.local data: blob: https:; media-src 'self' https://media.local https://files.local blob:; font-src 'self';">
 <title>备忘录</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -46,6 +46,11 @@
   <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 10v6M9 13h6"/></symbol>
   <symbol id="i-ai" viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M9 9v12"/></symbol>
 </svg>
 
 <div class="app" id="app">
@@ -107,7 +112,7 @@
       <button class="foot-btn" id="btnData" type="button">
         <svg class="icon"><use href="#i-folder-open"/></svg><span>数据文件夹</span>
       </button>
-      <div class="ver">WinNote 2.0 · <span id="profileLabel">本机</span></div>
+      <div class="ver">WinNote 3.0 · <span id="profileLabel">本机</span></div>
     </div>
   </aside>
 
@@ -247,6 +252,184 @@
   </main>
 </div>
 
+<section class="settings-page hidden" id="settingsPage">
+  <aside class="settings-sidebar">
+    <div class="settings-brand">
+      <img src="icon.png" alt="">
+      <div><strong>设置</strong><span>WinNote 3.0</span></div>
+    </div>
+    <button class="settings-back" id="settingsBack" type="button">
+      <svg class="icon"><use href="#i-arrow-left"/></svg><span>返回备忘录</span>
+    </button>
+    <label class="settings-search">
+      <svg class="icon"><use href="#i-search"/></svg>
+      <input id="settingsSearch" type="text" placeholder="搜索设置" autocomplete="off" spellcheck="false">
+    </label>
+    <nav class="settings-nav" id="settingsNav">
+      <button class="active" data-settings-section="appearance" type="button"><svg class="icon"><use href="#i-palette"/></svg><span>外观</span></button>
+      <button data-settings-section="themes" type="button"><svg class="icon"><use href="#i-sparkles"/></svg><span>主题</span></button>
+      <button data-settings-section="data" type="button"><svg class="icon"><use href="#i-database"/></svg><span>数据与备份</span></button>
+      <button data-settings-section="privacy" type="button"><svg class="icon"><use href="#i-lock"/></svg><span>隐私与锁定</span></button>
+      <button data-settings-section="window" type="button"><svg class="icon"><use href="#i-window"/></svg><span>窗口</span></button>
+      <button data-settings-section="shortcuts" type="button"><svg class="icon"><use href="#i-settings"/></svg><span>快捷键</span></button>
+      <button data-settings-section="about" type="button"><svg class="icon"><use href="#i-info"/></svg><span>关于</span></button>
+    </nav>
+    <div class="settings-side-foot">设置会保存在当前数据文件夹</div>
+  </aside>
+
+  <main class="settings-main">
+    <header class="settings-header">
+      <div>
+        <h1>设置</h1>
+        <p>把外观、主题、数据和窗口行为调成你喜欢的样子。</p>
+      </div>
+      <button class="btn primary" id="settingsDone" type="button">完成</button>
+    </header>
+
+    <div class="settings-scroll" id="settingsScroll">
+      <section class="settings-section" data-settings-section="appearance" id="secAppearance">
+        <div class="settings-section-title">
+          <h2>外观</h2>
+          <p>主题、深浅、主题色、圆角和动画</p>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-card-head">
+            <div><h3>主题</h3><p>内置主题随 exe 一起打包；自定义主题可以从下方导入。</p></div>
+            <span class="setting-pill" id="activeThemeName">平面</span>
+          </div>
+          <div class="theme-grid" id="themeGrid"></div>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-card-head"><div><h3>深浅模式</h3><p>每个数据文件夹可以单独保存。</p></div></div>
+          <div class="segmented" id="modeOptions">
+            <button data-mode="light" type="button"><svg class="icon"><use href="#i-sun"/></svg><span>浅色</span></button>
+            <button data-mode="dark" type="button"><svg class="icon"><use href="#i-moon"/></svg><span>深色</span></button>
+          </div>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-card-head"><div><h3>主题色</h3><p>按钮、选中态和强调色都会跟着变。</p></div></div>
+          <div class="accent-grid" id="accentGrid"></div>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-card-head"><div><h3>圆角</h3><p>从直角到超圆，也可以选苹果连续曲率。</p></div></div>
+          <div class="radius-grid" id="radiusGrid"></div>
+        </div>
+
+        <div class="setting-card setting-card-row">
+          <div><h3>界面动画</h3><p>关闭后所有过渡立即完成，适合远程桌面或低性能设备。</p></div>
+          <button class="switch" id="animToggle" type="button" role="switch" aria-checked="true"><i></i></button>
+        </div>
+      </section>
+
+      <section class="settings-section" data-settings-section="themes" id="secThemes">
+        <div class="settings-section-title">
+          <h2>主题</h2>
+          <p>内置主题之外，可以导入 .js 主题配置</p>
+        </div>
+        <div class="setting-card">
+          <div class="setting-card-head">
+            <div><h3>自定义主题</h3><p>文件放在当前数据文件夹的 <code>appearance</code> 目录，导入后立即生效。</p></div>
+            <div class="setting-head-actions">
+              <button class="btn ghost" id="btnOpenAppearance" type="button">打开目录</button>
+              <button class="btn ghost" id="btnImportThemeLibrary" type="button">导入 D:\app\appearance</button>
+              <button class="btn primary" id="btnImportTheme" type="button">导入 .js</button>
+            </div>
+          </div>
+          <div class="custom-theme-list" id="customThemeList"></div>
+          <p class="setting-note" id="appearancePath"></p>
+        </div>
+      </section>
+
+      <section class="settings-section" data-settings-section="data" id="secData">
+        <div class="settings-section-title">
+          <h2>数据与备份</h2>
+          <p>多个数据文件夹互相独立，旧文件夹不会被移动或删除</p>
+        </div>
+        <div class="setting-card">
+          <div class="setting-card-head">
+            <div><h3>数据文件夹</h3><p>每个档案有自己的笔记、图片、附件、主题和设置。</p></div>
+            <div class="setting-head-actions">
+              <button class="btn ghost" id="btnNewProfile" type="button">新建</button>
+              <button class="btn ghost" id="btnChooseProfile" type="button">选择已有</button>
+              <button class="btn ghost" id="btnRenameProfile" type="button">重命名</button>
+            </div>
+          </div>
+          <div class="profile-list" id="settingsProfileList"></div>
+          <p class="setting-note" id="settingsDataPath"></p>
+        </div>
+        <div class="setting-card setting-card-row">
+          <div><h3>打开当前数据文件夹</h3><p>notes.json、images、files、appearance 都在这里。</p></div>
+          <button class="btn ghost" id="btnOpenData" type="button">打开</button>
+        </div>
+      </section>
+
+      <section class="settings-section" data-settings-section="privacy" id="secPrivacy">
+        <div class="settings-section-title">
+          <h2>隐私与锁定</h2>
+          <p>笔记密码只保存在本机</p>
+        </div>
+        <div class="setting-card setting-card-row">
+          <div><h3>备忘录密码</h3><p id="privacyPasscodeText">未设置，可锁定单条笔记。</p></div>
+          <button class="btn ghost" id="btnPrivacyPasscode" type="button">设置</button>
+        </div>
+        <div class="setting-card">
+          <h3>本地优先</h3>
+          <p class="setting-note">WinNote 不联网、不上传。数据文件夹是分开存放，不代替整盘加密；敏感内容请使用单条笔记锁定。</p>
+        </div>
+      </section>
+
+      <section class="settings-section" data-settings-section="window" id="secWindow">
+        <div class="settings-section-title">
+          <h2>窗口</h2>
+          <p>最大化、拖动和设备兼容</p>
+        </div>
+        <div class="setting-card">
+          <div class="setting-card-head"><div><h3>最大化顶部安全边距</h3><p>任务栏 / PowerToys 顶栏等占用屏幕顶部时，留出空间避免挡住标题栏。</p></div><b id="insetValue">0 px</b></div>
+          <input class="setting-range" id="topInset" type="range" min="0" max="64" step="4" value="0">
+          <p class="setting-note">修改后如果窗口已最大化，会自动重新计算工作区。</p>
+        </div>
+        <div class="setting-card setting-card-row">
+          <div><h3>移动窗口</h3><p>如果标题栏被其它悬浮窗挡住，点这里后用鼠标拖动窗口。</p></div>
+          <button class="btn ghost" id="btnMoveWindow" type="button">开始移动</button>
+        </div>
+      </section>
+
+      <section class="settings-section" data-settings-section="shortcuts" id="secShortcuts">
+        <div class="settings-section-title"><h2>快捷键</h2><p>常用操作</p></div>
+        <div class="setting-card shortcut-list">
+          <div><span>新建备忘录</span><kbd>Ctrl N</kbd></div>
+          <div><span>全局快速新建</span><kbd>Ctrl Alt N</kbd></div>
+          <div><span>移动窗口</span><kbd>Ctrl Alt M</kbd></div>
+          <div><span>导入文件</span><kbd>Ctrl O</kbd></div>
+          <div><span>搜索</span><kbd>Ctrl F</kbd></div>
+          <div><span>立即保存</span><kbd>Ctrl S</kbd></div>
+          <div><span>关闭弹层 / 设置</span><kbd>Esc</kbd></div>
+        </div>
+      </section>
+
+      <section class="settings-section" data-settings-section="about" id="secAbout">
+        <div class="settings-section-title"><h2>关于</h2><p>WinNote 3.0.0</p></div>
+        <div class="about-card">
+          <img src="icon.png" alt="">
+          <div>
+            <h3>WinNote 备忘录</h3>
+            <p>本地优先的 Windows 桌面备忘录。WPF + WebView2，数据只保存在本机。</p>
+            <div class="about-meta"><span>版本 3.0.0</span><span>Windows 10 / 11</span><span>离线</span></div>
+          </div>
+        </div>
+        <div class="setting-card">
+          <h3>主题文件格式</h3>
+          <p class="setting-note">自定义主题是一个 .js 文件，调用 <code>WinNote.registerTheme({...})</code>，可以定义 light / dark 颜色表和可选 css。完整示例见 README。</p>
+        </div>
+      </section>
+    </div>
+  </main>
+</section>
+
 <div class="popover-layer hidden" id="popoverLayer"></div>
 <div class="print-root" id="printRoot"></div>
 <div class="toasts" id="toasts"></div>
@@ -292,6 +475,7 @@
   </div>
 </div>
 
+<script src="themes.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

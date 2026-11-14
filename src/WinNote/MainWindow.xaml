@@ -5,7 +5,7 @@
         Title="备忘录"
         Icon="Assets/app.ico"
         Width="1360" Height="880"
-        MinWidth="1040" MinHeight="640"
+        MinWidth="940" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -107,7 +107,7 @@
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource ChromeFg}" />
                     <TextBlock x:Name="AppSub"
-                               Text="WinNote"
+                               Text="WinNote 3.0"
                                FontSize="11"
                                Margin="9,1,0,0"
                                VerticalAlignment="Center"

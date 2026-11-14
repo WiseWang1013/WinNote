@@ -1,10 +1,10 @@
-# WinNote 备忘录 2.0
+# WinNote 备忘录 3.0
 
 仿华为 / 苹果 / 小米备忘录的 Windows 桌面备忘录，WPF + WebView2 界面，数据全部保存在本机。
 
 ![WinNote 界面](docs/preview.png)
 
-当前版本：**2.0.0**（WinNote 2.0）
+当前版本：**3.0.0**（WinNote 3.0）
 
 ## 这个仓库
 
@@ -15,11 +15,69 @@
 
 ## 下载
 
-- GitHub 发布页：<https://github.com/WiseWang1013/WinNote/releases/tag/v2.0.0>
-- GitHub 直接下载：<https://github.com/WiseWang1013/WinNote/releases/download/v2.0.0/WinNote.exe>
-- Gitee 发布页：<https://gitee.com/WiseWang1013/WinNote/releases/tag/v2.0.0>
-- Gitee 直接下载：<https://gitee.com/WiseWang1013/WinNote/releases/download/v2.0.0/WinNote.exe>
+- GitHub 发布页：<https://github.com/WiseWang1013/WinNote/releases/tag/v3.0.0>
+- GitHub 直接下载：<https://github.com/WiseWang1013/WinNote/releases/download/v3.0.0/WinNote.exe>
+- GitHub 主题包：<https://github.com/WiseWang1013/WinNote/releases/download/v3.0.0/WinNote-appearance.zip>
+- Gitee 发布页：<https://gitee.com/WiseWang1013/WinNote/releases/tag/v3.0.0>
+- Gitee 直接下载：<https://gitee.com/WiseWang1013/WinNote/releases/download/v3.0.0/WinNote.exe>
+- Gitee 主题包：<https://gitee.com/WiseWang1013/WinNote/releases/download/v3.0.0/WinNote-appearance.zip>
+- 旧版 2.0：<https://github.com/WiseWang1013/WinNote/releases/tag/v2.0.0>
 - 旧版 1.0：<https://github.com/WiseWang1013/WinNote/releases/tag/v1.0.0>
+
+## 3.0 新增
+
+- **完整设置页**：类似浏览器 / Zen 的设置界面，左侧分栏、右侧滚动内容，支持搜索设置。
+- **4 套内置主题**：平面、拟物、简约、液态玻璃，全部打包进 exe；每套都有独立的浅色 / 深色配色。
+- **主题色与深浅**：蓝、浅蓝、浅绿、薰衣草、玫瑰、琥珀、石墨；浅色 / 深色独立保存。
+- **自定义 JS 主题**：导入 `.js` 主题配置到当前数据文件夹的 `appearance` 目录，立即出现在主题列表里；导入入口默认打开 `D:\app\appearance`。
+- **圆角风格**：直角（2px）/ 小圆角（8px）/ 圆角（14px）/ 大圆角（22px）/ 苹果连续圆角（18px superellipse）/ 超圆（34px），整体组件跟着变。
+- **动画开关与过渡**：面板、卡片、主题切换和设置页都有平滑过渡；可以一键关闭动画。
+- **切换笔记不再整页闪**：切换时只更新当前卡片和编辑区，不再重绘整个笔记列表。
+- **窗口安全边距**：最大化时按显示器工作区排布，避开任务栏 / AppBar；设置页可调顶部安全边距；`Ctrl+Alt+M` 或设置里的「移动窗口」可在标题栏被悬浮窗挡住时拖动。
+- **1.0 / 2.0 / 3.0 数据互通**：直接替换 exe 即可读取旧 `data`；旧 `notes.json` 缺的新字段自动按空值处理。
+- 继续保留 2.0 的多数据文件夹、文件夹 / 标签 / 智能文件夹、附件 / 录音、手写、密码锁定、Office / WPS / OneNote 导入、语音输入等。
+
+## 主题文件格式
+
+自定义主题是一个 `.js` 文件，放在当前数据文件夹的 `data\appearance`（导入时自动复制），例如：
+
+```js
+WinNote.registerTheme({
+  id: 'acrylic',
+  name: '亚克力',
+  subtitle: 'Acrylic',
+  description: '半透明亚克力材质',
+  light: {
+    bg: '#E8EFF8',
+    panel: 'rgba(255,255,255,.62)',
+    panel2: 'rgba(248,251,255,.45)',
+    text: '#16202C', text2: '#4C5A6D', text3: '#76869A',
+    line: 'rgba(255,255,255,.55)', lineStrong: 'rgba(255,255,255,.75)',
+    hover: 'rgba(255,255,255,.35)', active: 'rgba(255,255,255,.5)',
+    danger: '#D14332', dangerSoft: 'rgba(209,67,50,.1)',
+    searchBg: 'rgba(255,255,255,.45)', cardLine: 'rgba(255,255,255,.5)',
+    cardShadow: '0 4px 18px rgba(40,70,110,.12)',
+    cardShadowHover: '0 12px 30px rgba(40,70,110,.2)',
+    shadowLg: '0 24px 60px rgba(40,70,110,.25)',
+    toolbarShadow: '0 12px 30px rgba(40,70,110,.2)',
+    scrollThumb: 'rgba(40,70,110,.18)',
+    appBg: 'linear-gradient(135deg,#e9f2ff,#f4ecff 55%,#e3fbf1)',
+    panelSolid: '#E9F2FF', glassBlur: '24px'
+  },
+  dark: { /* 同样的字段，深色值 */ },
+  css: 'body[data-style="acrylic"] .sidebar { backdrop-filter: blur(24px); }'
+});
+```
+
+内置主题也在 `src/WinNote/wwwroot/themes.js`，可以直接参考。主题文件是本地受信任的 JS，导入前请确认来源。
+
+### 已生成的 10 个额外主题
+
+`D:\app\appearance` 里已经放好 10 个可直接导入的主题：
+
+`亚克力`、`Aero`、`磨砂玻璃`、`极光`、`海盐`、`莫兰迪`、`暗夜霓虹`、`纸张`、`咖啡`、`樱花`。
+
+主题源文件也放在仓库的 `appearance/` 目录，Release 里提供 `WinNote-appearance.zip`。打开设置 → 主题，点「导入 D:\app\appearance」，会把这 10 个主题复制到当前 data 文件夹的 `appearance` 目录并显示在主题列表中。
 
 ## 2.0 新增
 
@@ -62,7 +120,8 @@ D:\app\WinNote\WinNote.exe
   - `data\notes.json`：全部笔记
   - `data\images\`：插入的图片、扫描图、手写涂鸦
   - `data\files\`：音频、视频、附件
-  - `data\settings.json`：主题、文件夹、OCR 语言、密码哈希等
+  - `data\appearance\`：当前数据文件夹的自定义主题
+  - `data\settings.json`：主题、深浅、主题色、圆角、动画、文件夹、OCR 语言、密码哈希等
 - 便携使用：把 `WinNote.exe` 和 `data` 文件夹一起拷走即可。
 
 ### 兼容 1.0 的 data

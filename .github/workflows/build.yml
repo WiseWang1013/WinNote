@@ -24,16 +24,23 @@ jobs:
       - name: Publish self-contained single-file exe
         run: dotnet publish src/WinNote/WinNote.csproj -c Release -r win-x64 --self-contained true -o dist
 
+      - name: Package appearance themes
+        run: Compress-Archive -Path appearance\* -DestinationPath dist\WinNote-appearance.zip -Force
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: WinNote-win-x64
-          path: dist/WinNote.exe
+          path: |
+            dist/WinNote.exe
+            dist/WinNote-appearance.zip
 
       - name: Attach WinNote.exe to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/WinNote.exe
+          files: |
+            dist/WinNote.exe
+            dist/WinNote-appearance.zip
           fail_on_unmatched_files: true
           generate_release_notes: false

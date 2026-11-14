@@ -33,7 +33,17 @@ const SMART_VIEWS = [
 
 const state = {
   notes: [],
-  settings: { theme: 'light', hasPasscode: false, ocrLanguage: 'zh-Hans', ocrLanguages: [] },
+  settings: { theme: 'light', hasPasscode: false, ocrLanguage: 'zh-Hans', ocrLanguages: [], appearance: {} },
+  appearance: {
+    themeId: 'flat',
+    accent: 'blue',
+    radiusStyle: 'squircle',
+    animations: true,
+    topSafeInset: 0,
+  },
+  customThemes: [],
+  customThemeFiles: [],
+  settingsOpen: false,
   profile: { id: '', name: '本机', path: '', profiles: [] },
   folders: CATEGORIES.map((c) => ({ ...c })),
   tags: [],
@@ -59,6 +69,7 @@ const state = {
 const dom = {};
 const pendingCalls = new Map();
 let callSeq = 0;
+let appearanceSaveTimer = null;
 
 /* ================= 与 C# 通信 ================= */
 
@@ -112,13 +123,20 @@ async function init() {
     const data = await call('load');
     state.notes = (data.notes || []).map(normalizeNote);
     state.settings = Object.assign(
-      { theme: 'light', hasPasscode: false, folders: [], ocrLanguage: 'zh-Hans', ocrLanguages: [] },
+      {
+        theme: 'light', hasPasscode: false, folders: [], ocrLanguage: 'zh-Hans', ocrLanguages: [],
+        appearance: {}, appearanceDir: '', customThemes: [],
+      },
       data.settings || {}
     );
     state.folders = normalizeFolders(state.settings.folders);
     state.profile = data.profile || { id: '', name: '本机', path: '', profiles: [] };
+    state.appearance = normalizeAppearance(state.settings.appearance);
+    state.settings.theme = state.appearance.mode;
+    state.customThemeFiles = state.settings.customThemes || [];
+    await loadCustomThemes(state.customThemeFiles);
     state.tags = collectTags();
-    applyTheme(state.settings.theme, false);
+    applyAppearance({ persist: false, syncChrome: true });
     renderSidebar();
     renderList();
 
@@ -158,6 +176,11 @@ function cacheDom() {
     'app', 'btnNew', 'btnImport', 'nav', 'countAll', 'countPinned', 'countTrash',
     'btnManageFolders', 'folders', 'tagList', 'smartList',
     'btnTheme', 'themeIcon', 'themeLabel', 'btnSettings', 'btnData', 'profileLabel', 'viewTitle', 'viewCount',
+    'settingsPage', 'settingsBack', 'settingsDone', 'settingsNav', 'settingsSearch', 'settingsScroll',
+    'themeGrid', 'accentGrid', 'radiusGrid', 'modeOptions', 'animToggle', 'activeThemeName',
+    'customThemeList', 'btnImportTheme', 'btnImportThemeLibrary', 'btnOpenAppearance', 'appearancePath',
+    'settingsProfileList', 'settingsDataPath', 'btnNewProfile', 'btnChooseProfile', 'btnRenameProfile',
+    'btnOpenData', 'privacyPasscodeText', 'btnPrivacyPasscode', 'topInset', 'insetValue', 'btnMoveWindow',
     'btnEmptyTrash', 'btnSort', 'searchInput', 'btnClearSearch', 'noteList', 'listEmpty',
     'listEmptyText', 'btnNew2', 'editorPane', 'editorEmpty', 'btnNew3', 'editor',
     'noteTime', 'noteWords', 'saveState', 'btnCategoryChip', 'catChipDot',
@@ -247,8 +270,98 @@ function bindEvents() {
   });
 
   dom.btnManageFolders.addEventListener('click', openFolderManager);
-  dom.btnSettings.addEventListener('click', openSettings);
+  dom.btnSettings.addEventListener('click', () => openSettingsPage());
   dom.btnSort.addEventListener('click', () => openSortPopover(dom.btnSort));
+
+  dom.settingsBack.addEventListener('click', closeSettingsPage);
+  dom.settingsDone.addEventListener('click', closeSettingsPage);
+  dom.settingsNav.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-settings-section]');
+    if (!button) return;
+    scrollToSettingsSection(button.dataset.settingsSection);
+  });
+  dom.settingsSearch.addEventListener('input', filterSettingsSections);
+  dom.themeGrid.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-theme-id]');
+    if (!card) return;
+    state.appearance.themeId = card.dataset.themeId;
+    applyAppearance();
+    renderAppearanceControls();
+    renderSidebar();
+  });
+  dom.accentGrid.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-accent-id]');
+    if (!button) return;
+    state.appearance.accent = button.dataset.accentId;
+    applyAppearance();
+    renderAppearanceControls();
+  });
+  dom.radiusGrid.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-radius-id]');
+    if (!card) return;
+    state.appearance.radiusStyle = card.dataset.radiusId;
+    applyAppearance();
+    renderAppearanceControls();
+  });
+  dom.modeOptions.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-mode]');
+    if (!button) return;
+    applyTheme(button.dataset.mode, true);
+    renderAppearanceControls();
+  });
+  dom.animToggle.addEventListener('click', () => {
+    state.appearance.animations = !state.appearance.animations;
+    applyAppearance();
+    renderAppearanceControls();
+  });
+  dom.btnImportTheme.addEventListener('click', importCustomTheme);
+  dom.btnImportThemeLibrary.addEventListener('click', importThemeLibrary);
+  dom.btnOpenAppearance.addEventListener('click', () => {
+    call('openAppearanceFolder').catch((error) => toast(error.message, 'error'));
+  });
+  dom.customThemeList.addEventListener('click', async (event) => {
+    const use = event.target.closest('[data-use-theme]');
+    if (use) {
+      state.appearance.themeId = use.dataset.useTheme;
+      applyAppearance();
+      renderAppearanceControls();
+      renderSidebar();
+      return;
+    }
+    const remove = event.target.closest('[data-delete-theme]');
+    if (remove) {
+      await deleteCustomTheme(remove.dataset.deleteTheme);
+    }
+  });
+  dom.btnNewProfile.addEventListener('click', createDataProfile);
+  dom.btnChooseProfile.addEventListener('click', chooseDataProfile);
+  dom.btnRenameProfile.addEventListener('click', renameCurrentProfile);
+  dom.btnOpenData.addEventListener('click', () => {
+    call('openDataFolder').catch((error) => toast(error.message, 'error'));
+  });
+  dom.settingsProfileList.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-switch-profile]');
+    if (!button) return;
+    await switchProfile(button.dataset.switchProfile);
+    renderSettingsPage();
+  });
+  dom.btnPrivacyPasscode.addEventListener('click', async () => {
+    await changePasscodeFlow();
+    renderSettingsPage();
+  });
+  dom.btnMoveWindow.addEventListener('click', () => {
+    call('moveWindow').catch((error) => toast(error.message, 'error'));
+  });
+  let insetTimer = null;
+  dom.topInset.addEventListener('input', () => {
+    const value = Number(dom.topInset.value) || 0;
+    dom.insetValue.textContent = value + ' px';
+    state.appearance.topSafeInset = value;
+    clearTimeout(insetTimer);
+    insetTimer = setTimeout(() => {
+      call('setWindowInset', { topSafeInset: value }).catch((error) => toast(error.message, 'error'));
+    }, 220);
+  });
 
   dom.tagRow.addEventListener('click', async (event) => {
     const remove = event.target.closest('[data-remove-tag]');
@@ -394,8 +507,19 @@ function onGlobalKeyDown(event) {
   }
   if (ctrl && event.key.toLowerCase() === 'f') {
     event.preventDefault();
-    dom.searchInput.focus();
-    dom.searchInput.select();
+    if (state.settingsOpen) {
+      dom.settingsSearch.focus();
+      dom.settingsSearch.select();
+    } else {
+      dom.searchInput.focus();
+      dom.searchInput.select();
+    }
+    return;
+  }
+  if (ctrl && event.key === ',') {
+    event.preventDefault();
+    if (state.settingsOpen) closeSettingsPage();
+    else openSettingsPage();
     return;
   }
   if (ctrl && event.key.toLowerCase() === 's') {
@@ -410,6 +534,8 @@ function onGlobalKeyDown(event) {
       closeModal(false);
     } else if (!dom.popoverLayer.classList.contains('hidden')) {
       closePopover();
+    } else if (state.settingsOpen) {
+      closeSettingsPage();
     } else if (state.voiceOn) {
       stopVoice();
     } else if (state.selectedImage) {
@@ -750,7 +876,9 @@ function updateEmptyBody() {
 
 async function openNote(id) {
   if (state.currentId === id) {
-    renderList();
+    dom.noteList.querySelectorAll('.note-card').forEach((card) => {
+      card.classList.toggle('active', card.dataset.id === id);
+    });
     return;
   }
   if (state.recording) await stopRecording();
@@ -794,7 +922,9 @@ async function openNote(id) {
   updateEditorMeta();
 
   dom.editorScroll.scrollTop = 0;
-  renderList();
+  dom.noteList.querySelectorAll('.note-card').forEach((card) => {
+    card.classList.toggle('active', card.dataset.id === id);
+  });
   requestAnimationFrame(() => {
     const card = dom.noteList.querySelector('.note-card.active');
     if (card) card.scrollIntoView({ block: 'nearest' });
@@ -1601,7 +1731,7 @@ function applyEditorColor(note) {
   const colors = colorOf(note.color);
   dom.editor.style.setProperty('--note-bg', colors.bg);
   dom.editor.style.setProperty('--note-fg', colors.fg);
-  dom.editorPane.style.background = colors.bg;
+  dom.editorPane.style.background = document.body.dataset.style === 'glass' ? 'transparent' : colors.bg;
 }
 
 function syncPinButton() {
@@ -2099,11 +2229,18 @@ async function applyProfileData(data) {
   if (!data) return;
   state.notes = (data.notes || []).map(normalizeNote);
   state.settings = Object.assign(
-    { theme: 'light', hasPasscode: false, folders: [], ocrLanguage: 'zh-Hans', ocrLanguages: [] },
+    {
+      theme: 'light', hasPasscode: false, folders: [], ocrLanguage: 'zh-Hans', ocrLanguages: [],
+      appearance: {}, appearanceDir: '', customThemes: [],
+    },
     data.settings || {}
   );
   state.profile = data.profile || state.profile;
   state.folders = normalizeFolders(state.settings.folders);
+  state.appearance = normalizeAppearance(state.settings.appearance);
+  state.settings.theme = state.appearance.mode;
+  state.customThemeFiles = state.settings.customThemes || [];
+  await loadCustomThemes(state.customThemeFiles);
   state.tags = collectTags();
   state.currentId = null;
   state.currentNote = null;
@@ -2112,9 +2249,10 @@ async function applyProfileData(data) {
   state.view = { type: 'all', category: null, tag: null, smart: null };
   dom.searchInput.value = '';
   dom.btnClearSearch.classList.add('hidden');
-  applyTheme(state.settings.theme, false);
+  applyAppearance({ persist: false, syncChrome: true });
   renderSidebar();
   renderList();
+  if (state.settingsOpen) renderSettingsPage();
 
   const first = visibleNotes().find((note) => !note.locked);
   if (first) await openNote(first.id);
@@ -2184,6 +2322,7 @@ async function renameCurrentProfile() {
     state.profile = result.profile;
     closeModal(false);
     renderSidebar();
+    if (state.settingsOpen) renderSettingsPage();
     toast('已重命名');
   } catch (error) {
     toast('重命名失败：' + error.message, 'error');
@@ -3479,28 +3618,398 @@ function afterBodyEdit() {
   scheduleSave();
 }
 
-/* ================= 主题 ================= */
+/* ================= 外观 / 主题 ================= */
 
-function applyTheme(theme, persist) {
-  theme = theme === 'dark' ? 'dark' : 'light';
-  state.settings.theme = theme;
-  document.body.dataset.theme = theme;
-  updateThemeButton();
+const THEME_KIT = window.WinNoteThemeKit || {
+  builtinThemes: [],
+  accents: [{ id: 'blue', name: '蓝', light: '#0A59F7', dark: '#4C8DFF' }],
+  radiusPresets: [{ id: 'squircle', name: '苹果连续圆角', description: '', radius: '17px', sm: '10px', lg: '24px', xl: '28px', corner: 'superellipse(4)' }],
+  getAccent: () => ({ light: '#0A59F7', dark: '#4C8DFF' }),
+  getRadius: () => ({ id: 'squircle' }),
+  getCustomThemes: () => [],
+};
 
-  if (state.currentNote) {
-    applyEditorColor(state.currentNote);
+function normalizeAppearance(raw) {
+  const source = raw || {};
+  const mode = (source.mode || state.settings.theme || 'light') === 'dark' ? 'dark' : 'light';
+  return {
+    mode,
+    themeId: source.themeId || 'flat',
+    accent: source.accent || 'blue',
+    radiusStyle: source.radiusStyle || 'squircle',
+    animations: source.animations !== false,
+    topSafeInset: Math.max(0, Math.min(80, Number(source.topSafeInset) || 0)),
+  };
+}
+
+function hexToRgba(hex, alpha) {
+  const value = String(hex || '').replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(value)) {
+    return `rgba(10, 89, 247, ${alpha})`;
   }
-  renderList();
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function themeById(id) {
+  const builtins = THEME_KIT.builtinThemes || [];
+  const custom = state.customThemes || [];
+  return builtins.find((theme) => theme.id === id) || custom.find((theme) => theme.id === id) || builtins[0];
+}
+
+function allThemes() {
+  return [...(THEME_KIT.builtinThemes || []), ...(state.customThemes || [])];
+}
+
+async function loadCustomThemes(files) {
+  state.customThemeFiles = Array.isArray(files) ? files.slice() : [];
+  state.customThemes = [];
+  window.__WINNOTE_CUSTOM_THEMES__ = {};
+  document.querySelectorAll('script[data-custom-theme]').forEach((script) => script.remove());
+
+  for (const file of state.customThemeFiles) {
+    try {
+      const before = new Set(Object.keys(window.__WINNOTE_CUSTOM_THEMES__ || {}));
+      await new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.dataset.customTheme = file;
+        script.src = `https://appearance.local/${encodeURIComponent(file)}?v=${Date.now()}`;
+        script.onload = resolve;
+        script.onerror = resolve;
+        document.head.appendChild(script);
+      });
+      if (window.__WINNOTE_THEME__) {
+        window.WinNote.registerTheme(window.__WINNOTE_THEME__);
+        delete window.__WINNOTE_THEME__;
+      }
+      for (const [id, theme] of Object.entries(window.__WINNOTE_CUSTOM_THEMES__ || {})) {
+        if (!before.has(id) && theme && !theme.file) {
+          theme.file = file;
+        }
+      }
+    } catch {
+      // 单个主题失败不影响其它主题
+    }
+  }
+
+  const builtinIds = new Set((THEME_KIT.builtinThemes || []).map((theme) => theme.id));
+  state.customThemes = (THEME_KIT.getCustomThemes() || []).map((theme) => {
+    const copy = { ...theme, custom: true };
+    if (builtinIds.has(copy.id)) copy.id = 'custom-' + copy.id;
+    return copy;
+  });
+
+  if (!themeById(state.appearance.themeId)) {
+    state.appearance.themeId = 'flat';
+  }
+}
+
+function applyAppearance({ persist = true, syncChrome = true } = {}) {
+  state.appearance = normalizeAppearance(state.appearance);
+  state.settings.theme = state.appearance.mode;
+  const theme = themeById(state.appearance.themeId) || THEME_KIT.builtinThemes[0];
+  if (!theme) return;
+
+  const mode = state.appearance.mode;
+  const palette = Object.assign({}, theme[mode] || theme.light || {});
+  const accent = THEME_KIT.getAccent(state.appearance.accent);
+  const accentColor = accent?.[mode] || accent?.light || '#0A59F7';
+  const accentSoft = hexToRgba(accentColor, mode === 'dark' ? 0.18 : 0.1);
+  const accentShadow = hexToRgba(accentColor, mode === 'dark' ? 0.28 : 0.22);
+
+  const vars = {
+    '--bg': palette.bg,
+    '--panel': palette.panel,
+    '--panel-2': palette.panel2,
+    '--text': palette.text,
+    '--text-2': palette.text2,
+    '--text-3': palette.text3,
+    '--line': palette.line,
+    '--line-strong': palette.lineStrong,
+    '--hover': palette.hover,
+    '--active': palette.active,
+    '--danger': palette.danger,
+    '--danger-soft': palette.dangerSoft,
+    '--search-bg': palette.searchBg,
+    '--card-line': palette.cardLine,
+    '--card-shadow': palette.cardShadow,
+    '--card-shadow-hover': palette.cardShadowHover,
+    '--shadow-lg': palette.shadowLg,
+    '--toolbar-shadow': palette.toolbarShadow,
+    '--scroll-thumb': palette.scrollThumb,
+    '--app-bg': palette.appBg || palette.bg,
+    '--glass-blur': palette.glassBlur || '0px',
+    '--accent': accentColor,
+    '--accent-soft': accentSoft,
+    '--accent-shadow': accentShadow,
+  };
+
+  for (const [key, value] of Object.entries(vars)) {
+    if (value) document.body.style.setProperty(key, value);
+  }
+
+  document.body.dataset.theme = mode;
+  document.body.dataset.style = theme.id;
+  document.body.dataset.radius = state.appearance.radiusStyle;
+  document.body.dataset.anim = state.appearance.animations ? 'on' : 'off';
+
+  let customStyle = document.getElementById('customThemeCss');
+  if (!customStyle) {
+    customStyle = document.createElement('style');
+    customStyle.id = 'customThemeCss';
+    document.head.appendChild(customStyle);
+  }
+  customStyle.textContent = theme.css || '';
+
+  updateThemeButton();
+  if (state.currentNote) applyEditorColor(state.currentNote);
+
+  if (syncChrome) {
+    const solid = (value, fallback) => (/^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback);
+    call('setChrome', {
+      bg: solid(palette.panelSolid, mode === 'dark' ? '#17181C' : '#FFFFFF'),
+      fg: solid(palette.text, mode === 'dark' ? '#ECEDEF' : '#1A1A1C'),
+      sub: solid(palette.text3, mode === 'dark' ? '#8D9097' : '#7B7D85'),
+      hover: solid(palette.panel2, mode === 'dark' ? '#25272C' : '#E4E6EA'),
+      pressed: solid(palette.lineStrong, mode === 'dark' ? '#2F3137' : '#D9DBE0'),
+      line: solid(palette.line, mode === 'dark' ? '#26282E' : '#E5E7EC'),
+    }).catch(() => {});
+  }
 
   if (persist) {
-    call('setTheme', { theme }).catch(() => {});
+    clearTimeout(appearanceSaveTimer);
+    appearanceSaveTimer = setTimeout(() => {
+      call('saveAppearance', {
+        themeId: state.appearance.themeId,
+        accent: state.appearance.accent,
+        radiusStyle: state.appearance.radiusStyle,
+        animations: state.appearance.animations,
+        topSafeInset: state.appearance.topSafeInset,
+      }).catch((error) => toast('保存外观失败：' + error.message, 'error'));
+    }, 120);
   }
+}
+
+function applyTheme(theme, persist = true) {
+  const mode = theme === 'dark' ? 'dark' : 'light';
+  state.settings.theme = mode;
+  state.appearance.mode = mode;
+  applyAppearance({ persist: false, syncChrome: true });
+  renderList();
+  if (persist) {
+    call('setTheme', { theme: mode }).catch(() => {});
+  }
+  if (state.settingsOpen) renderAppearanceControls();
 }
 
 function updateThemeButton() {
   const dark = state.settings.theme === 'dark';
   dom.themeLabel.textContent = dark ? '浅色模式' : '深色模式';
   dom.themeIcon.setAttribute('href', dark ? '#i-sun' : '#i-moon');
+}
+
+/* ================= 设置大页面 ================= */
+
+function openSettingsPage(section = 'appearance') {
+  state.settingsOpen = true;
+  renderSettingsPage();
+  dom.settingsPage.classList.remove('hidden', 'closing');
+  document.body.classList.add('settings-open');
+  requestAnimationFrame(() => {
+    dom.settingsScroll.scrollTop = 0;
+    scrollToSettingsSection(section, false);
+  });
+}
+
+function closeSettingsPage() {
+  if (!state.settingsOpen) return;
+  state.settingsOpen = false;
+  dom.settingsPage.classList.add('closing');
+  document.body.classList.remove('settings-open');
+  setTimeout(() => {
+    if (state.settingsOpen) return;
+    dom.settingsPage.classList.add('hidden');
+    dom.settingsPage.classList.remove('closing');
+  }, 170);
+  renderSidebar();
+  renderList();
+}
+
+function scrollToSettingsSection(section, smooth = true) {
+  const target = document.querySelector(`.settings-section[data-settings-section="${CSS.escape(section)}"]`);
+  if (!target) return;
+  dom.settingsNav.querySelectorAll('[data-settings-section]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.settingsSection === section);
+  });
+  target.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+}
+
+function filterSettingsSections() {
+  const query = dom.settingsSearch.value.trim().toLowerCase();
+  dom.settingsPage.querySelectorAll('.settings-section').forEach((section) => {
+    const match = !query || section.innerText.toLowerCase().includes(query);
+    section.classList.toggle('hidden', !match);
+  });
+  dom.settingsNav.querySelectorAll('[data-settings-section]').forEach((button) => {
+    const section = document.querySelector(`.settings-section[data-settings-section="${CSS.escape(button.dataset.settingsSection)}"]`);
+    button.classList.toggle('hidden', !!section && section.classList.contains('hidden'));
+  });
+}
+
+function renderSettingsPage() {
+  renderAppearanceControls();
+  renderCustomThemes();
+  renderSettingsProfiles();
+  dom.appearancePath.textContent = state.settings.appearanceDir ? '当前目录：' + state.settings.appearanceDir : '';
+  dom.settingsDataPath.textContent = state.profile.path ? '当前路径：' + state.profile.path : '';
+  dom.privacyPasscodeText.textContent = state.settings.hasPasscode
+    ? `已设置密码 · ${state.notes.filter((note) => note.locked && !note.deleted).length} 条笔记已锁定`
+    : '未设置，可锁定单条笔记。';
+  dom.btnPrivacyPasscode.textContent = state.settings.hasPasscode ? '更改密码' : '设置密码';
+  dom.topInset.value = String(state.appearance.topSafeInset || 0);
+  dom.insetValue.textContent = (state.appearance.topSafeInset || 0) + ' px';
+}
+
+function renderAppearanceControls() {
+  const activeTheme = themeById(state.appearance.themeId) || allThemes()[0];
+  dom.activeThemeName.textContent = activeTheme ? activeTheme.name : '平面';
+
+  dom.themeGrid.innerHTML = allThemes().map((theme) => {
+    const palette = theme[state.appearance.mode] || theme.light || {};
+    const accent = THEME_KIT.getAccent(state.appearance.accent);
+    const accentColor = accent?.[state.appearance.mode] || accent?.light || '#0A59F7';
+    const active = theme.id === state.appearance.themeId;
+    return `<button class="theme-card ${active ? 'active' : ''}" type="button" data-theme-id="${escapeHtml(theme.id)}">
+      <div class="theme-preview" style="background:${escapeHtml(palette.appBg || palette.bg || '#eee')}">
+        <i class="tp-side" style="background:${escapeHtml(palette.panel || '#fff')}"></i>
+        <i class="tp-list" style="background:${escapeHtml(palette.panel2 || palette.bg || '#f5f5f5')}"></i>
+        <i class="tp-card" style="background:${escapeHtml(palette.panel || '#fff')}"></i>
+        <i class="tp-accent" style="background:${escapeHtml(accentColor)}"></i>
+      </div>
+      <strong>${escapeHtml(theme.name || theme.id)}${theme.custom ? ' · 自定义' : ''}</strong>
+      <span>${escapeHtml(theme.subtitle || theme.description || '')}</span>
+      ${active ? '<i class="theme-check"><svg class="icon"><use href="#i-check"/></svg></i>' : ''}
+    </button>`;
+  }).join('');
+
+  dom.modeOptions.querySelectorAll('[data-mode]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.mode === state.appearance.mode);
+  });
+
+  dom.accentGrid.innerHTML = (THEME_KIT.accents || []).map((accent) => {
+    const color = accent[state.appearance.mode] || accent.light;
+    const active = accent.id === state.appearance.accent;
+    return `<button class="accent-swatch ${active ? 'active' : ''}" type="button" data-accent-id="${escapeHtml(accent.id)}"
+      style="background:${escapeHtml(color)}" title="${escapeHtml(accent.name)}">
+      ${active ? '<svg class="icon"><use href="#i-check"/></svg>' : ''}
+    </button>`;
+  }).join('');
+
+  dom.radiusGrid.innerHTML = (THEME_KIT.radiusPresets || []).map((radius) => {
+    const active = radius.id === state.appearance.radiusStyle;
+    return `<button class="radius-card ${active ? 'active' : ''}" type="button" data-radius-id="${escapeHtml(radius.id)}">
+      <div class="radius-demo"></div>
+      <strong>${escapeHtml(radius.name)}</strong>
+      <span>${escapeHtml(radius.description || '')}</span>
+    </button>`;
+  }).join('');
+
+  dom.animToggle.setAttribute('aria-checked', state.appearance.animations ? 'true' : 'false');
+  dom.animToggle.setAttribute('title', state.appearance.animations ? '关闭动画' : '开启动画');
+}
+
+function renderCustomThemes() {
+  const list = state.customThemes || [];
+  dom.customThemeList.innerHTML = list.length
+    ? list.map((theme) => {
+        const palette = theme.light || {};
+        const active = theme.id === state.appearance.themeId;
+        return `<div class="custom-theme-item">
+          <i class="custom-theme-swatch" style="background:linear-gradient(135deg, ${escapeHtml(palette.bg || '#eee')}, ${escapeHtml(palette.panel || '#fff')})"></i>
+          <div class="custom-theme-main">
+            <strong>${escapeHtml(theme.name || theme.id)}${active ? ' · 使用中' : ''}</strong>
+            <span>${escapeHtml(theme.description || theme.file || '')}</span>
+          </div>
+          <div class="custom-theme-actions">
+            <button class="mini-btn" type="button" data-use-theme="${escapeHtml(theme.id)}">使用</button>
+            <button class="mini-btn danger" type="button" data-delete-theme="${escapeHtml(theme.file || '')}">删除</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="sidebar-empty">还没有自定义主题。导入一个 .js 文件即可。</div>';
+}
+
+function renderSettingsProfiles() {
+  const profiles = state.profile?.profiles || [];
+  dom.settingsProfileList.innerHTML = profiles.map((profile) => {
+    const active = profile.id === state.profile?.id;
+    return `<div class="profile-item ${active ? 'active' : ''}">
+      <div class="profile-main">
+        <div class="profile-name">${escapeHtml(profile.name)}${active ? ' · 当前' : ''}</div>
+        <div class="profile-path" title="${escapeHtml(profile.path)}">${escapeHtml(profile.path)}</div>
+      </div>
+      ${active ? '' : `<button class="mini-btn" type="button" data-switch-profile="${escapeHtml(profile.id)}">切换</button>`}
+    </div>`;
+  }).join('');
+}
+
+async function importCustomTheme() {
+  try {
+    const before = new Set((state.customThemes || []).map((theme) => theme.id));
+    const imported = await call('importTheme');
+    if (!imported) return;
+    const result = await call('listCustomThemes');
+    await loadCustomThemes(result.files || []);
+    const added = (state.customThemes || []).find((theme) => !before.has(theme.id));
+    if (added) {
+      state.appearance.themeId = added.id;
+      applyAppearance();
+      renderSidebar();
+    }
+    renderSettingsPage();
+    toast(added ? '已导入并启用「' + (added.name || added.id) + '」' : '主题已导入，请在列表中选择');
+  } catch (error) {
+    toast('导入主题失败：' + error.message, 'error');
+  }
+}
+
+async function importThemeLibrary() {
+  try {
+    const before = new Set((state.customThemes || []).map((theme) => theme.id));
+    const result = await call('importThemeLibrary');
+    await loadCustomThemes(result.files || []);
+    const added = (state.customThemes || []).filter((theme) => !before.has(theme.id));
+    renderSettingsPage();
+    renderSidebar();
+    toast(added.length
+      ? `已从 D:\\app\\appearance 导入 ${result.count} 个主题，列表里可以切换`
+      : `D:\\app\\appearance 里的 ${result.count} 个主题已经导入过了`);
+  } catch (error) {
+    toast('批量导入失败：' + error.message, 'error');
+  }
+}
+
+async function deleteCustomTheme(file) {
+  if (!file) return;
+  const ok = await confirmDialog('删除自定义主题', '只会删除当前数据文件夹 appearance 目录里的这个 .js 文件，确定吗？', '删除', true);
+  if (!ok) return;
+
+  try {
+    await call('deleteTheme', { file });
+    const result = await call('listCustomThemes');
+    await loadCustomThemes(result.files || []);
+    if (!themeById(state.appearance.themeId)) {
+      state.appearance.themeId = 'flat';
+    }
+    applyAppearance();
+    renderSettingsPage();
+    renderSidebar();
+    toast('已删除主题');
+  } catch (error) {
+    toast('删除失败：' + error.message, 'error');
+  }
 }
 
 /* ================= 提示与对话框 ================= */

@@ -21,6 +21,7 @@ public sealed class NoteStore
     public string DataDir { get; private set; } = "";
     public string ImagesDir { get; private set; } = "";
     public string FilesDir { get; private set; } = "";
+    public string AppearanceDir { get; private set; } = "";
     public AppSettings Settings => _settings;
     public string Theme => _settings.Theme;
     public bool HasPasscode => !string.IsNullOrEmpty(_settings.LockHash);
@@ -45,8 +46,10 @@ public sealed class NoteStore
                 : dataDir);
         ImagesDir = System.IO.Path.Combine(DataDir, "images");
         FilesDir = System.IO.Path.Combine(DataDir, "files");
+        AppearanceDir = System.IO.Path.Combine(DataDir, "appearance");
         Directory.CreateDirectory(ImagesDir);
         Directory.CreateDirectory(FilesDir);
+        Directory.CreateDirectory(AppearanceDir);
         Directory.CreateDirectory(System.IO.Path.Combine(DataDir, "web"));
         _notesFile = System.IO.Path.Combine(DataDir, "notes.json");
         _settingsFile = System.IO.Path.Combine(DataDir, "settings.json");
@@ -126,6 +129,24 @@ public sealed class NoteStore
         }
     }
 
+    public void SaveAppearance(
+        string themeId,
+        string accent,
+        string radiusStyle,
+        bool animations,
+        int topSafeInset)
+    {
+        lock (_gate)
+        {
+            _settings.ThemeId = string.IsNullOrWhiteSpace(themeId) ? "flat" : themeId.Trim();
+            _settings.Accent = string.IsNullOrWhiteSpace(accent) ? "blue" : accent.Trim();
+            _settings.RadiusStyle = string.IsNullOrWhiteSpace(radiusStyle) ? "squircle" : radiusStyle.Trim();
+            _settings.Animations = animations;
+            _settings.TopSafeInset = Math.Clamp(topSafeInset, 0, 80);
+            WriteSettings();
+        }
+    }
+
     public void SaveFolders(IEnumerable<FolderInfo> folders)
     {
         lock (_gate)
@@ -193,6 +214,10 @@ public sealed class NoteStore
         }
 
         _settings.Theme = _settings.Theme == "dark" ? "dark" : "light";
+        _settings.ThemeId = string.IsNullOrWhiteSpace(_settings.ThemeId) ? "flat" : _settings.ThemeId;
+        _settings.Accent = string.IsNullOrWhiteSpace(_settings.Accent) ? "blue" : _settings.Accent;
+        _settings.RadiusStyle = string.IsNullOrWhiteSpace(_settings.RadiusStyle) ? "squircle" : _settings.RadiusStyle;
+        _settings.TopSafeInset = Math.Clamp(_settings.TopSafeInset, 0, 80);
         _settings.Folders ??= new List<FolderInfo>();
         if (_settings.Folders.Count == 0)
         {

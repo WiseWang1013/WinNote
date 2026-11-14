@@ -331,3 +331,45 @@ dotnet publish .\src\WinNote\WinNote.csproj -c Release -r win-x64 --self-contain
 - 正文是 UTF-8 / UTF-16 / GB18030 自动识别，任意 Unicode 都可保存。
 - OCR 语言通过 `OcrEngine.AvailableRecognizerLanguages` 列给设置页；`RecognizeAsync(image, tag)` 优先用选中语言，失败回退 `zh-Hans` / 用户配置。
 - 界面文案目前中文；没有做完整 i18n / RTL 镜像。
+
+## 15. 3.0 外观与设置页
+
+### 设置页
+
+- 设置不再是弹窗，而是覆盖在 WebView 内的全屏页：`#settingsPage`，左侧 `settings-sidebar` + 右侧 `settings-main` + 可滚动 section。
+- 设置分区：外观、主题、数据与备份、隐私与锁定、窗口、快捷键、关于。
+- `settingsSearch` 按 section 文本过滤；`settingsNav` 滚动到对应 section；`Ctrl+,` 打开/关闭设置。
+
+### 主题引擎
+
+- `wwwroot/themes.js` 定义 `WinNoteThemeKit`：4 套内置主题、7 个主题色、4 种圆角。
+- 每个主题提供 `light` / `dark` 两套颜色表：`bg/panel/panel2/text/text2/text3/line/.../appBg/panelSolid/glassBlur`。
+- `applyAppearance()` 把颜色写成 body 的内联 CSS 变量（必须写在 body 上，否则会被 `body[data-theme="dark"]` 的 `--accent` 覆盖），并设置 `data-theme`、`data-style`、`data-radius`、`data-anim`。
+- `setChrome` 把标题栏的 bg/fg/line 同步给 WPF，避免 WebView 内主题和原生标题栏颜色脱节。
+- 内置主题打包在 `wwwroot/themes.js`（EmbeddedResource），不依赖网络。
+
+### 自定义主题
+
+- 主题是 `.js` 文件，通过 `WinNote.registerTheme({...})` 注册；`themes.js` 里预置 registerTheme。
+- 每个数据文件夹有独立 `appearance` 目录；`NoteStore.AppearanceDir` 创建，WebView2 映射到 `appearance.local`。
+- CSP 的 `script-src` 允许 `https://appearance.local`；`loadCustomThemes()` 动态插入 `<script src="https://appearance.local/file.js">`，加载后从 `window.__WINNOTE_CUSTOM_THEMES__` 取主题对象。
+- 导入时 C# `importTheme` 复制文件到当前 profile；`deleteTheme` 只删当前 profile 的文件。主题、主题色、圆角、动画、顶部安全边距都存在该 profile 的 `settings.json`。
+- 文件排序/加载失败不影响内置主题；自定义主题属于本地受信任代码，导入前需确认来源。
+
+### 圆角
+
+- `--radius/--radius-sm/--radius-lg/--radius-xl` 由 `body[data-radius]` 控制；`corner-shape` 在苹果连续圆角时用 `superellipse(4)`，其它模式回落 `round`。
+- 关键组件（卡片、按钮、工具栏、设置卡、主题卡、弹层、附件）统一使用变量，避免只圆一部分。
+- 预设：直角 2px、小圆角 8px、圆角 14px、大圆角 22px、苹果连续圆角 18px + `superellipse(4)`、超圆 34px。
+
+### 动画与闪屏
+
+- 切换笔记时不再调用 `renderList()` 重绘整个列表；只更新 `.note-card.active`，消除列表整体闪烁。
+- 去掉 `.note-card` 的入场动画，避免搜索/筛选时所有卡片重新弹入；主题切换的颜色用 CSS transition 平滑过渡。
+- 设置页打开/关闭用 `settingsIn` / `settingsOut` 两个短动画；`data-anim="off"` 时全部过渡变为 0.001ms。
+
+### 窗口兼容
+
+- `WM_GETMINMAXINFO` 继续按 `rcWork` 最大化；`TopSafeInset` 额外把最大化位置向下移、高度减少，给 PowerToys 顶栏等悬浮层留出空间（WindowChrome 的 8px 边框会补偿）。
+- `Ctrl+Alt+M` 注册为移动窗口热键，设置页也有「移动窗口」按钮；即使标题栏被遮挡，也能进入 `DragMove()`。
+- 最小窗口宽度降到 940，WebView 内 980/1060 断点调整三栏宽度；设置页在 900/760 断点折叠侧栏/卡片。
